@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/auth_model.dart';
+import 'api_config.dart';
 
 /// Custom exception class to handle various API error scenarios.
 class ApiException implements Exception {
@@ -31,8 +32,8 @@ class NetworkException extends ApiException {
 }
 
 class AuthService {
-  // Replace this with your actual backend base URL
-  static const String _baseUrl = 'https://sehatid-backend-production.up.railway.app/api';
+  // Uses centralized api_config.dart
+  static const String _baseUrl = ApiConfig.baseUrl;
 
   final http.Client _client;
 

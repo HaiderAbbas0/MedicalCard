@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local configuration and script files
+.env
+mobileClone.bat
+run_test.bat

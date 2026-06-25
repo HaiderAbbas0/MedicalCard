@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/chat_models.dart';
+import 'api_config.dart';
 import 'auth_service.dart';
 
 class ChatService {
-  static const String _baseUrl = 'https://sehatid-backend-production.up.railway.app/api';
+  static const String _baseUrl = ApiConfig.baseUrl;
 
   final http.Client _client;
 
