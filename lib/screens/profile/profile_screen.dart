@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../data/mock_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -13,7 +15,8 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final p = mockPatient;
+    final auth = context.watch<AuthController>();
+    final p = auth.currentUser?.toPatient() ?? mockPatient;
 
     return Scaffold(
       backgroundColor: c.bg,

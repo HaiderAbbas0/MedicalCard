@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../data/mock_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -22,8 +24,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl = TextEditingController(text: 'Ayesha Khan');
-    _phoneCtrl = TextEditingController(text: '+92 3••••••21');
+    final auth = context.read<AuthController>();
+    final user = auth.currentUser;
+    _nameCtrl = TextEditingController(text: user?.name ?? 'Ayesha Khan');
+    _phoneCtrl = TextEditingController(text: user?.phone ?? '+92 3••••••21');
     _emergencyCtrl = TextEditingController(text: 'Bilal Khan');
   }
 
@@ -46,6 +50,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final auth = context.watch<AuthController>();
+    final p = auth.currentUser?.toPatient() ?? mockPatient;
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -93,7 +99,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             gradient: brandGradient(context),
                             shape: BoxShape.circle,
                           ),
-                          child: Text(mockPatient.initials,
+                          child: Text(p.initials,
                               style: AppText.display.copyWith(
                                   fontSize: 30, color: Colors.white)),
                         ),
@@ -128,9 +134,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: _ReadOnlyField(
-                            label: 'Blood group', value: 'B+'),
+                            label: 'Blood group', value: p.blood),
                       ),
                       const SizedBox(width: 14),
                       Expanded(

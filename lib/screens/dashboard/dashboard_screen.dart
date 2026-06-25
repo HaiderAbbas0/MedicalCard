@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../data/mock_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -15,16 +17,19 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthController>();
+    final p = auth.currentUser?.toPatient() ?? mockPatient;
+
     return Scaffold(
       backgroundColor: context.c.bg,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
-            _greeting(context),
+            _greeting(context, p),
             const SizedBox(height: 18),
             HealthCardWidget(
-              patient: mockPatient,
+              patient: p,
               onShow: () => context.push('/card'),
             ),
             const SizedBox(height: 20),
@@ -47,7 +52,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // ── Greeting row ──────────────────────────────────────────────────────
-  Widget _greeting(BuildContext context) {
+  Widget _greeting(BuildContext context, Patient p) {
     final c = context.c;
     return Row(
       children: [
@@ -60,7 +65,7 @@ class DashboardScreen extends StatelessWidget {
             shape: BoxShape.circle,
           ),
           child: Text(
-            mockPatient.initials,
+            p.initials,
             style: AppText.title.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w800,
@@ -76,7 +81,7 @@ class DashboardScreen extends StatelessWidget {
                   style: AppText.caption.copyWith(color: c.text2)),
               const SizedBox(height: 2),
               Text(
-                mockPatient.name,
+                p.name,
                 style: AppText.heading
                     .copyWith(color: c.text, fontSize: 19, fontWeight: FontWeight.w800),
                 maxLines: 1,
@@ -133,13 +138,19 @@ class DashboardScreen extends StatelessWidget {
       crossAxisCount: 2,
       crossAxisSpacing: 11,
       mainAxisSpacing: 11,
-      childAspectRatio: 1.5,
+      childAspectRatio: 1.08,
       children: [
         _StatCard(
           dot: c.safe,
           label: 'Active Meds',
           value: '$kActiveMeds',
           sub: '2 due today',
+          previewItems: [
+            StatPreviewItem(text: 'Amlodipine (5mg)', color: c.danger),
+            StatPreviewItem(text: 'Aspirin (75mg)', color: c.danger),
+            StatPreviewItem(text: 'Metformin (500mg)', color: c.safe),
+            StatPreviewItem(text: 'Pantoprazole (40mg)', color: c.safe),
+          ],
           onTap: () => context.go('/prescriptions'),
         ),
         _StatCard(
@@ -148,12 +159,25 @@ class DashboardScreen extends StatelessWidget {
           value: '$kAllergyCount',
           valueColor: c.danger,
           sub: 'Penicillin · Sulfa',
+          previewItems: const [
+            StatPreviewItem(text: 'Penicillin'),
+            StatPreviewItem(text: 'Sulfa drugs'),
+          ],
         ),
         _StatCard(
           dot: c.info,
           label: 'Recent Visits',
           value: '$kRecentVisits',
           sub: 'last 6 months',
+          previewItems: const [
+            StatPreviewItem(text: 'Cardiology · 18 Jun'),
+            StatPreviewItem(text: 'Endocrinology · 02 May'),
+            StatPreviewItem(text: 'Cardiology · 21 Mar'),
+            StatPreviewItem(text: 'Gen Medicine · 09 Feb'),
+            StatPreviewItem(text: 'Ophthalmology · 15 Jan'),
+            StatPreviewItem(text: 'Dental · 05 Dec'),
+            StatPreviewItem(text: 'Orthopedics · 12 Nov'),
+          ],
           onTap: () => context.go('/history'),
         ),
         _StatCard(
@@ -161,6 +185,10 @@ class DashboardScreen extends StatelessWidget {
           label: 'Next Appt',
           value: '24 Jun',
           sub: 'Dr. Imran',
+          previewItems: const [
+            StatPreviewItem(text: 'Dr. Imran Yousuf'),
+            StatPreviewItem(text: 'Shifa Hospital'),
+          ],
         ),
       ],
     );
@@ -346,6 +374,13 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
+/// A preview item inside the stats card with optional custom text color.
+class StatPreviewItem {
+  final String text;
+  final Color? color;
+  const StatPreviewItem({required this.text, this.color});
+}
+
 /// A single 2×2 stat tile (colored dot + label, big value, caption sub).
 class _StatCard extends StatelessWidget {
   final Color dot;
@@ -353,6 +388,7 @@ class _StatCard extends StatelessWidget {
   final String value;
   final Color? valueColor;
   final String sub;
+  final List<StatPreviewItem>? previewItems;
   final VoidCallback? onTap;
 
   const _StatCard({
@@ -360,6 +396,7 @@ class _StatCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.sub,
+    this.previewItems,
     this.valueColor,
     this.onTap,
   });
@@ -377,7 +414,6 @@ class _StatCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
@@ -398,6 +434,53 @@ class _StatCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          if (previewItems != null && previewItems!.isNotEmpty) ...[
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final item in previewItems!)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 4.5,
+                                height: 4.5,
+                                decoration: BoxDecoration(
+                                  color: item.color ?? dot.withValues(alpha: 0.7),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  item.text,
+                                  style: AppText.small.copyWith(
+                                    color: item.color ?? c.text2,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ] else
+            const Spacer(),
+          const SizedBox(height: 6),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -411,7 +494,7 @@ class _StatCard extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 sub,
-                style: AppText.small.copyWith(color: c.text3),
+                style: AppText.small.copyWith(color: c.text3, fontSize: 11),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

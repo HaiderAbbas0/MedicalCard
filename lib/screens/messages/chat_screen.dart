@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
-import '../../data/mock_data.dart';
+import '../../controllers/auth_controller.dart';
+import '../../controllers/chat_controller.dart';
+import '../../models/chat_models.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/press_scale.dart';
@@ -15,20 +18,16 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  late final Conversation convo = mockConversations.firstWhere(
-    (e) => e.doctorId == widget.doctorId,
-    orElse: () => mockConversations.first,
-  );
-
-  late final List<ChatMessage> _messages = [...convo.messages];
-
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ChatController>().markAsRead(widget.doctorId);
+      _scrollToBottom();
+    });
   }
 
   @override
@@ -50,15 +49,33 @@ class _ChatScreenState extends State<ChatScreen> {
   void _send() {
     final t = _input.text.trim();
     if (t.isEmpty) return;
-    setState(() {
-      _messages.add(ChatMessage(text: t, fromMe: true, time: 'now'));
-    });
+    final chat = context.read<ChatController>();
+    final auth = context.read<AuthController>();
+    chat.sendMessage(auth.token!, widget.doctorId, t);
     _input.clear();
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
   @override
   Widget build(BuildContext context) {
+    final chat = context.watch<ChatController>();
+    final convo = chat.conversations.firstWhere(
+      (e) => e.doctorId == widget.doctorId,
+      orElse: () => Conversation(
+        doctorId: widget.doctorId,
+        initials: 'Dr',
+        name: 'Doctor',
+        last: '',
+        time: '',
+        unread: 0,
+        online: false,
+        messages: [],
+      ),
+    );
+
+    // Scroll to bottom after rebuild
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+
     return Scaffold(
       backgroundColor: context.c.bg,
       resizeToAvoidBottomInset: false,
@@ -66,7 +83,7 @@ class _ChatScreenState extends State<ChatScreen> {
         bottom: false,
         child: Column(
           children: [
-            _header(context),
+            _header(context, convo),
             Expanded(
               child: Container(
                 color: context.c.bg,
@@ -84,7 +101,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
                     ),
-                    for (final m in _messages) _bubble(context, m),
+                    for (final m in convo.messages) _bubble(context, m),
                   ],
                 ),
               ),
@@ -96,7 +113,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _header(BuildContext context) {
+  Widget _header(BuildContext context, Conversation convo) {
     return Container(
       decoration: BoxDecoration(
         color: context.c.surface,

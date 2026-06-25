@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
-import '../../data/mock_data.dart';
+import '../../controllers/record_controller.dart';
+import '../../models/record_models.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/gradient_button.dart';
@@ -20,8 +22,23 @@ class VisitDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final v = mockVisits.firstWhere((e) => e.id == visitId,
-        orElse: () => mockVisits.first);
+    final records = context.watch<RecordController>();
+    final v = records.visits.firstWhere((e) => e.id == visitId,
+        orElse: () => VisitModel(
+              id: 'v_fallback',
+              dx: 'Unknown Visit',
+              doctor: 'Unknown Doctor',
+              specialty: 'General Medicine',
+              hospital: 'Sehat Clinic',
+              dateLabel: 'Today',
+              time: '00:00',
+              symptoms: 'No symptoms recorded.',
+              diagnosis: 'No diagnosis recorded.',
+              diagnosisNote: '',
+              meds: [],
+              followUp: 'None',
+              advice: '',
+            ));
     final c = context.c;
 
     return Scaffold(
@@ -209,7 +226,7 @@ class _Label extends StatelessWidget {
 }
 
 class _MedRow extends StatelessWidget {
-  final Med med;
+  final MedModel med;
 
   const _MedRow({required this.med});
 

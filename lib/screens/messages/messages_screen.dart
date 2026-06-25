@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
-import '../../data/mock_data.dart';
+import '../../controllers/chat_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/app_card.dart';
@@ -74,12 +75,22 @@ class MessagesScreen extends StatelessWidget {
   }
 
   Widget _buildList(BuildContext context) {
+    final chat = context.watch<ChatController>();
+    final list = chat.conversations;
+    if (list.isEmpty) {
+      return Center(
+        child: Text(
+          'No messages yet.',
+          style: AppText.body.copyWith(color: context.c.text3),
+        ),
+      );
+    }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
-      itemCount: mockConversations.length,
+      itemCount: list.length,
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (_, i) {
-        final c = mockConversations[i];
+        final c = list[i];
         return AppCard(
           radius: 16,
           padding: const EdgeInsets.all(13),

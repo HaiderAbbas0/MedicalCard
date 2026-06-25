@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../data/mock_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -15,6 +17,9 @@ class HealthCardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final auth = context.watch<AuthController>();
+    final p = auth.currentUser?.toPatient() ?? mockPatient;
+
     return Scaffold(
       backgroundColor: c.bg,
       body: SafeArea(
@@ -25,7 +30,7 @@ class HealthCardScreen extends StatelessWidget {
             children: [
               _header(context),
               const SizedBox(height: 18),
-              _card(context),
+              _card(context, p),
               const SizedBox(height: 18),
               Row(
                 children: [
@@ -77,7 +82,7 @@ class HealthCardScreen extends StatelessWidget {
   }
 
   // ── Gradient card ─────────────────────────────────────────────────────
-  Widget _card(BuildContext context) {
+  Widget _card(BuildContext context, Patient p) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(26),
@@ -140,7 +145,7 @@ class HealthCardScreen extends StatelessWidget {
                   child: Hero(
                     tag: 'health-qr',
                     child: QrImageView(
-                      data: kHealthCardQr,
+                      data: '${p.healthId}|${p.name}|${p.blood}|${p.dob}',
                       version: QrVersions.auto,
                       size: 172,
                       padding: EdgeInsets.zero,
@@ -162,7 +167,7 @@ class HealthCardScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Text(
-                  mockPatient.initials,
+                  p.initials,
                   style: AppText.heading.copyWith(
                       color: Colors.white,
                       fontSize: 26,
@@ -171,7 +176,7 @@ class HealthCardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                mockPatient.name,
+                p.name,
                 style: AppText.heading.copyWith(
                     color: Colors.white,
                     fontSize: 22,
@@ -179,7 +184,7 @@ class HealthCardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'DOB ${mockPatient.dob}',
+                'DOB ${p.dob}',
                 style: AppText.mono
                     .copyWith(color: Colors.white.withValues(alpha: 0.9)),
               ),
@@ -193,9 +198,9 @@ class HealthCardScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: _field('HEALTH ID', mockPatient.healthId, mono: true),
+                    child: _field('HEALTH ID', p.healthId, mono: true),
                   ),
-                  _field('BLOOD', mockPatient.blood),
+                  _field('BLOOD', p.blood),
                 ],
               ),
             ],

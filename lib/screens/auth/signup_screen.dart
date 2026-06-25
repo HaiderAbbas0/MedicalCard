@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../../controllers/auth_controller.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -37,6 +40,37 @@ class _SignupScreenState extends State<SignupScreen> {
       _phoneCtrl.text.trim().isNotEmpty &&
       _pwCtrl.text.isNotEmpty &&
       _consent;
+
+  Future<void> _signUp() async {
+    if (_pwCtrl.text != _confirmCtrl.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Passwords do not match.'),
+          backgroundColor: Colors.red[800],
+        ),
+      );
+      return;
+    }
+
+    final authController = context.read<AuthController>();
+    final success = await authController.signUp(
+      name: _nameCtrl.text.trim(),
+      email: _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : '${_phoneCtrl.text.trim()}@sehatid.com',
+      password: _pwCtrl.text,
+      phone: _phoneCtrl.text.trim(),
+    );
+
+    if (success && mounted) {
+      context.push('/otp');
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authController.errorMessage ?? 'Registration failed. Please try again.'),
+          backgroundColor: Colors.red[800],
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,10 +179,15 @@ class _SignupScreenState extends State<SignupScreen> {
                 onTap: () => setState(() => _consent = !_consent),
               ),
               const SizedBox(height: 22),
-              GradientButton(
-                label: 'Continue',
-                enabled: _enabled,
-                onPressed: _enabled ? () => context.push('/otp') : null,
+              Consumer<AuthController>(
+                builder: (context, auth, child) {
+                  return GradientButton(
+                    label: 'Continue',
+                    enabled: _enabled,
+                    loading: auth.isLoading,
+                    onPressed: _enabled ? _signUp : null,
+                  );
+                },
               ),
             ],
           ),

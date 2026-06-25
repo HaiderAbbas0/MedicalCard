@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
-import '../../data/mock_data.dart';
+import '../../controllers/record_controller.dart';
+import '../../models/record_models.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/press_scale.dart';
@@ -50,15 +52,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
             Expanded(
               child: FakeLoader(
                 skeleton: const ShimmerList(count: 4),
-                builder: (ctx) => ListView(
-                  padding: const EdgeInsets.fromLTRB(22, 4, 22, 96),
-                  children: [
-                    for (final v in mockVisits) ...[
-                      _VisitCard(visit: v),
-                      const SizedBox(height: 12),
+                builder: (ctx) {
+                  final records = context.watch<RecordController>();
+                  final list = records.visits;
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(22, 4, 22, 96),
+                    children: [
+                      if (list.isEmpty)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 80),
+                            child: Text(
+                              'No medical history records found.',
+                              style: AppText.body.copyWith(color: context.c.text3),
+                            ),
+                          ),
+                        )
+                      else
+                        for (final v in list) ...[
+                          _VisitCard(visit: v),
+                          const SizedBox(height: 12),
+                        ],
                     ],
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ],
@@ -105,7 +122,7 @@ class _Chip extends StatelessWidget {
 }
 
 class _VisitCard extends StatelessWidget {
-  final Visit visit;
+  final VisitModel visit;
 
   const _VisitCard({required this.visit});
 

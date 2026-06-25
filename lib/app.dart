@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'providers/auth_provider.dart';
+import 'controllers/auth_controller.dart';
+import 'controllers/record_controller.dart';
+import 'controllers/chat_controller.dart';
 import 'providers/language_provider.dart';
 import 'providers/theme_provider.dart';
 import 'router.dart';
@@ -42,7 +44,31 @@ class AppProviders extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()..load()),
+        ChangeNotifierProvider(create: (_) => AuthController()..loadSession()),
+        ChangeNotifierProxyProvider<AuthController, RecordController>(
+          create: (_) => RecordController(),
+          update: (_, auth, record) {
+            final rec = record ?? RecordController();
+            if (auth.isAuthenticated) {
+              rec.loadRecords(auth.token!);
+            } else {
+              rec.clear();
+            }
+            return rec;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthController, ChatController>(
+          create: (_) => ChatController(),
+          update: (_, auth, chat) {
+            final ch = chat ?? ChatController();
+            if (auth.isAuthenticated) {
+              ch.loadConversations(auth.token!);
+            } else {
+              ch.clear();
+            }
+            return ch;
+          },
+        ),
         ChangeNotifierProvider(create: (_) => ThemeProvider()..load()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()..load()),
       ],

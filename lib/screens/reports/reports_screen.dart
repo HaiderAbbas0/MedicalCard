@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../../data/mock_data.dart';
+import '../../controllers/record_controller.dart';
+import '../../models/record_models.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/press_scale.dart';
@@ -36,26 +38,46 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(22, 0, 22, 14),
-              child: Text('12 reports · 2 new',
-                  style: AppText.body
-                      .copyWith(fontSize: 14, color: context.c.text2)),
+              child: Consumer<RecordController>(
+                builder: (context, records, child) {
+                  final total = records.reports.length;
+                  return Text('$total reports',
+                      style: AppText.body
+                          .copyWith(fontSize: 14, color: context.c.text2));
+                },
+              ),
             ),
             Expanded(
               child: FakeLoader(
                 skeleton: const ShimmerList(count: 4),
-                builder: (ctx) => ListView(
-                  padding: const EdgeInsets.fromLTRB(22, 4, 22, 96),
-                  children: [
-                    for (final r in mockReports) ...[
-                      _ReportCard(
-                        report: r,
-                        onDownload: () =>
-                            _snack(context, 'Downloading ${r.name}…'),
-                      ),
-                      const SizedBox(height: 12),
+                builder: (ctx) {
+                  final records = context.watch<RecordController>();
+                  final list = records.reports;
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(22, 4, 22, 96),
+                    children: [
+                      if (list.isEmpty)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 80),
+                            child: Text(
+                              'No lab reports found.',
+                              style: AppText.body.copyWith(color: context.c.text3),
+                            ),
+                          ),
+                        )
+                      else
+                        for (final r in list) ...[
+                          _ReportCard(
+                            report: r,
+                            onDownload: () =>
+                                _snack(context, 'Downloading ${r.name}…'),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                     ],
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ],
@@ -66,7 +88,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 }
 
 class _ReportCard extends StatelessWidget {
-  final Report report;
+  final ReportModel report;
   final VoidCallback onDownload;
 
   const _ReportCard({required this.report, required this.onDownload});
@@ -74,14 +96,23 @@ class _ReportCard extends StatelessWidget {
   ({Color fg, Color bg}) _statusColors(BuildContext context) {
     final c = context.c;
     switch (report.status) {
-      case ReportStatus.ready:
+      case 'ready':
         return (fg: c.safe, bg: c.safeBg);
-      case ReportStatus.reviewed:
+      case 'reviewed':
         return (fg: c.info, bg: c.infoBg);
-      case ReportStatus.abnormal:
+      case 'abnormal':
         return (fg: c.danger, bg: c.dangerBg);
+      default:
+        return (fg: c.info, bg: c.infoBg);
     }
   }
+
+  String get _statusLabel => switch (report.status) {
+        'ready' => 'Ready',
+        'reviewed' => 'Reviewed',
+        'abnormal' => 'Abnormal',
+        _ => report.status,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +160,7 @@ class _ReportCard extends StatelessWidget {
                     color: status.bg,
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: Text(report.statusLabel,
+                  child: Text(_statusLabel,
                       style: AppText.small.copyWith(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../providers/auth_provider.dart';
+import '../../controllers/auth_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/gradient_button.dart';
@@ -35,8 +35,21 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _showError = true);
       return;
     }
-    await context.read<AuthProvider>().completeLogin();
-    if (mounted) context.go('/dashboard');
+    final authController = context.read<AuthController>();
+    final success = await authController.login(
+      _idCtrl.text.trim(),
+      _pwCtrl.text,
+    );
+    if (success && mounted) {
+      context.go('/dashboard');
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authController.errorMessage ?? 'Login failed. Please try again.'),
+          backgroundColor: Colors.red[800],
+        ),
+      );
+    }
   }
 
   @override
@@ -132,9 +145,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              GradientButton(
-                label: _isPatient ? 'Sign in as Patient' : 'Sign in as Doctor',
-                onPressed: _signIn,
+              Consumer<AuthController>(
+                builder: (context, auth, child) {
+                  return GradientButton(
+                    label: _isPatient ? 'Sign in as Patient' : 'Sign in as Doctor',
+                    loading: auth.isLoading,
+                    onPressed: _signIn,
+                  );
+                },
               ),
               const SizedBox(height: 18),
               _InfoBanner(

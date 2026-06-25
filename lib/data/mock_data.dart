@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/auth_model.dart';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Patient
@@ -202,6 +203,51 @@ const mockVisits = [
     ],
     followUp: 'If not improving in 5 days',
     advice: 'Plenty of fluids and rest.',
+  ),
+  Visit(
+    id: 'v5',
+    dx: 'Eye check-up',
+    doctor: 'Dr. Aasim Rehman',
+    specialty: 'Ophthalmology',
+    hospital: 'Shifa International Hospital',
+    dateLabel: '15 Jan 2026',
+    time: '14:00',
+    symptoms: 'Blurry vision in left eye when reading.',
+    diagnosis: 'Presbyopia (H52.4)',
+    diagnosisNote: 'Prescribed reading glasses. Follow up in 1 year.',
+    meds: [Med('Lubricant Eye Drops', '0.5%', 'Four times daily', '30 days')],
+    followUp: '15 Jan 2027',
+    advice: 'Limit screen time, use drops daily.',
+  ),
+  Visit(
+    id: 'v6',
+    dx: 'Dental cleaning & filling',
+    doctor: 'Dr. Nadia Malik',
+    specialty: 'Dental',
+    hospital: 'Aga Khan University Hospital',
+    dateLabel: '05 Dec 2025',
+    time: '10:30',
+    symptoms: 'Sensitivity to cold water on upper right molar.',
+    diagnosis: 'Dental caries (K02.9)',
+    diagnosisNote: 'Composite filling done on tooth 14. Excellent oral hygiene.',
+    meds: [Med('Amoxicillin', '500 mg', 'Three times daily', '5 days')],
+    followUp: '05 Jun 2026',
+    advice: 'Brush twice daily, floss daily.',
+  ),
+  Visit(
+    id: 'v7',
+    dx: 'Knee pain evaluation',
+    doctor: 'Dr. Tariq Mahmood',
+    specialty: 'Orthopedics',
+    hospital: 'CMH Lahore',
+    dateLabel: '12 Nov 2025',
+    time: '12:15',
+    symptoms: 'Mild pain in right knee after walking long distances.',
+    diagnosis: 'Osteoarthritis of knee, unspecified (M17.9)',
+    diagnosisNote: 'Early stage OA. Recommended physical therapy.',
+    meds: [Med('Glucosamine', '1500 mg', 'Once daily', 'Ongoing')],
+    followUp: '12 May 2026',
+    advice: 'Avoid high-impact activities, knee support sleeve.',
   ),
 ];
 
@@ -477,3 +523,51 @@ const kRecentVisits = 7;
 
 const kAllergySuggestions = ['Penicillin', 'Sulfa', 'Aspirin', 'Latex', 'Pollen'];
 const kBloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+extension UserPatientExtension on UserModel {
+  Patient toPatient() {
+    int calculatedAge = 58;
+    if (dob != null && dob!.isNotEmpty) {
+      try {
+        final parts = dob!.split(' ');
+        if (parts.length == 3) {
+          final year = int.tryParse(parts.last);
+          if (year != null) {
+            calculatedAge = DateTime.now().year - year;
+          }
+        } else {
+          final date = DateTime.tryParse(dob!);
+          if (date != null) {
+            calculatedAge = DateTime.now().year - date.year;
+          }
+        }
+      } catch (_) {}
+    }
+
+    String maskedPhone = phone ?? '+92 3••••••21';
+    if (maskedPhone.length > 7) {
+      if (maskedPhone.contains(' ')) {
+        final parts = maskedPhone.split(' ');
+        if (parts.length == 3) {
+          maskedPhone = '${parts[0]} ${parts[1]}••••••${parts[2].substring(parts[2].length - 2)}';
+        }
+      } else {
+        maskedPhone = '${maskedPhone.substring(0, 5)}••••••${maskedPhone.substring(maskedPhone.length - 2)}';
+      }
+    }
+
+    return Patient(
+      name: name,
+      healthId: healthId ?? 'PK-HC-9F2A-7T',
+      dob: dob ?? '14 Mar 1958',
+      age: calculatedAge,
+      gender: gender ?? 'Male',
+      blood: bloodGroup ?? 'B+',
+      phoneMasked: maskedPhone,
+      allergies: const ['Penicillin', 'Sulfa drugs'],
+      chronic: const ['Hypertension', 'Type 2 Diabetes'],
+      emergencyName: 'Bilal Khan',
+      emergencyPhone: '+92 3••••••88',
+    );
+  }
+}

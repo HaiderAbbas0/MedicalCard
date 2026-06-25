@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../providers/auth_provider.dart';
+import '../../controllers/auth_controller.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../theme/app_colors.dart';
@@ -68,7 +68,7 @@ class SettingsScreen extends StatelessWidget {
                       child: PressScale(
                         onTap: () async {
                           Navigator.pop(sheetCtx);
-                          await context.read<AuthProvider>().signOut();
+                          await context.read<AuthController>().signOut();
                           if (context.mounted) context.go('/login');
                         },
                         semanticLabel: 'Log out',

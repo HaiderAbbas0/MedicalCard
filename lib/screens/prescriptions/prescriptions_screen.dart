@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../../data/mock_data.dart';
+import '../../controllers/record_controller.dart';
+import '../../models/record_models.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/icon_badge.dart';
@@ -19,8 +21,9 @@ class _PrescriptionsScreenState extends State<PrescriptionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final records = context.watch<RecordController>();
     final items =
-        mockPrescriptions.where((r) => r.active == _active).toList();
+        records.prescriptions.where((r) => r.active == _active).toList();
     return Scaffold(
       backgroundColor: context.c.bg,
       body: SafeArea(
@@ -116,7 +119,7 @@ class _Segment extends StatelessWidget {
 }
 
 class _RxCard extends StatelessWidget {
-  final Prescription rx;
+  final PrescriptionModel rx;
 
   const _RxCard({required this.rx});
 

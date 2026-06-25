@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../providers/auth_provider.dart';
+import '../../controllers/auth_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 
@@ -47,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _go() async {
-    final auth = context.read<AuthProvider>();
+    final auth = context.read<AuthController>();
     while (!auth.bootstrapped) {
       await Future<void>.delayed(const Duration(milliseconds: 60));
       if (!mounted) return;

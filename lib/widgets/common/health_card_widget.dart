@@ -88,7 +88,7 @@ class HealthCardWidget extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: QrImageView(
-                        data: kHealthCardQr,
+                        data: '${patient.healthId}|${patient.name}|${patient.blood}|${patient.dob}',
                         version: QrVersions.auto,
                         size: 48,
                         padding: EdgeInsets.zero,
