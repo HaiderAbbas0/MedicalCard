@@ -67,6 +67,8 @@ class AuthService {
           'Accept': 'application/json',
         },
         body: jsonEncode({
+          // `identifier` accepts CNIC, email, or phone (any role).
+          'identifier': email,
           'email': email,
           'password': password,
         }),
@@ -106,13 +108,14 @@ class AuthService {
     required String name,
     required String email,
     required String password,
+    String? cnic,
     String? phone,
     String? dob,
     String? gender,
     String? bloodGroup,
   }) async {
     final url = Uri.parse('$_baseUrl/auth/register');
-    
+
     try {
       final response = await _client.post(
         url,
@@ -121,13 +124,16 @@ class AuthService {
           'Accept': 'application/json',
         },
         body: jsonEncode({
+          'cnic': cnic,
+          'full_name': name,
           'name': name,
           'email': email,
           'password': password,
+          'phone_primary': phone,
           'phone':? phone,
-          'dob':? dob,
+          'date_of_birth':? dob,
           'gender':? gender,
-          'bloodGroup':? bloodGroup,
+          'blood_group':? bloodGroup,
         }),
       );
 
@@ -165,6 +171,53 @@ class AuthService {
         user: UserModel.fromJson(newUser),
       );
     }
+  }
+
+  /// Registers a doctor (created in PENDING status — no token returned).
+  /// Returns the server's confirmation message. Throws [ApiException] on failure.
+  Future<String> registerDoctor({
+    required String cnic,
+    required String fullName,
+    required String password,
+    required String pmdcNumber,
+    required String specialization,
+    String? clinicId,
+    String? phone,
+    String? email,
+    bool mbbs = false,
+    bool md = false,
+    bool fcps = false,
+    int? yearsExperience,
+    num? consultationFee,
+  }) async {
+    final url = Uri.parse('$_baseUrl/auth/register/doctor');
+    final response = await _client.post(
+      url,
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: jsonEncode({
+        'cnic': cnic,
+        'full_name': fullName,
+        'password': password,
+        'pmdc_number': pmdcNumber,
+        'specialization_primary': specialization,
+        if (clinicId != null) 'clinic_id': clinicId,
+        if (phone != null) 'phone_primary': phone,
+        if (email != null) 'email': email,
+        'qualification_mbbs': mbbs,
+        'qualification_md': md,
+        'qualification_fcps': fcps,
+        if (yearsExperience != null) 'years_of_experience': yearsExperience,
+        if (consultationFee != null) 'consultation_fee_pkr': consultationFee,
+      }),
+    );
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return body['message']?.toString() ?? 'Application submitted.';
+    }
+    final message = body['message']?.toString() ?? 'Registration failed.';
+    if (response.statusCode == 400) throw BadRequestException(message);
+    if (response.statusCode == 409) throw BadRequestException(message);
+    throw ApiException(message, statusCode: response.statusCode);
   }
 
   /// Common response processor to handle HTTP status codes and map to proper models or exceptions.

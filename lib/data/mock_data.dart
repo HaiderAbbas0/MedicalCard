@@ -444,14 +444,14 @@ const mockConversations = [
   Conversation(
     doctorId: 'care',
     initials: 'SC',
-    name: 'Sehat Care Team',
-    last: 'Welcome to Sehat ID 👋',
+    name: 'Hayaat Care Team',
+    last: 'Welcome to HayaatID 👋',
     time: 'Mon',
     unread: 0,
     online: false,
     messages: [
       ChatMessage(
-          text: 'Welcome to Sehat ID 👋 We’re here if you need anything.',
+          text: 'Welcome to HayaatID 👋 We’re here if you need anything.',
           fromMe: false,
           time: 'Mon'),
     ],
@@ -524,50 +524,47 @@ const kRecentVisits = 7;
 const kAllergySuggestions = ['Penicillin', 'Sulfa', 'Aspirin', 'Latex', 'Pollen'];
 const kBloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
+/// Split a free-text summary like "Penicillin, Sulfa" into a clean list.
+List<String> _splitSummary(dynamic value) {
+  final text = (value ?? '').toString().trim();
+  if (text.isEmpty) return const [];
+  return text.split(RegExp(r'[,;]')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+}
+
 extension UserPatientExtension on UserModel {
+  /// Build the dashboard/health-card [Patient] entirely from the live profile
+  /// (base fields + the patient's extended profile returned by the API).
   Patient toPatient() {
-    int calculatedAge = 58;
+    final ext = extended;
+
+    int calculatedAge = 0;
     if (dob != null && dob!.isNotEmpty) {
-      try {
-        final parts = dob!.split(' ');
-        if (parts.length == 3) {
-          final year = int.tryParse(parts.last);
-          if (year != null) {
-            calculatedAge = DateTime.now().year - year;
-          }
-        } else {
-          final date = DateTime.tryParse(dob!);
-          if (date != null) {
-            calculatedAge = DateTime.now().year - date.year;
-          }
-        }
-      } catch (_) {}
+      final date = DateTime.tryParse(dob!);
+      if (date != null) {
+        calculatedAge = DateTime.now().year - date.year;
+      } else {
+        final year = int.tryParse(dob!.split(' ').last);
+        if (year != null) calculatedAge = DateTime.now().year - year;
+      }
     }
 
-    String maskedPhone = phone ?? '+92 3••••••21';
+    String maskedPhone = phone ?? '';
     if (maskedPhone.length > 7) {
-      if (maskedPhone.contains(' ')) {
-        final parts = maskedPhone.split(' ');
-        if (parts.length == 3) {
-          maskedPhone = '${parts[0]} ${parts[1]}••••••${parts[2].substring(parts[2].length - 2)}';
-        }
-      } else {
-        maskedPhone = '${maskedPhone.substring(0, 5)}••••••${maskedPhone.substring(maskedPhone.length - 2)}';
-      }
+      maskedPhone = '${maskedPhone.substring(0, 5)}••••••${maskedPhone.substring(maskedPhone.length - 2)}';
     }
 
     return Patient(
       name: name,
-      healthId: healthId ?? 'PK-HC-9F2A-7T',
-      dob: dob ?? '14 Mar 1958',
+      healthId: (ext['health_card_number'] ?? healthId ?? '—').toString(),
+      dob: dob ?? '—',
       age: calculatedAge,
-      gender: gender ?? 'Male',
-      blood: bloodGroup ?? 'B+',
-      phoneMasked: maskedPhone,
-      allergies: const ['Penicillin', 'Sulfa drugs'],
-      chronic: const ['Hypertension', 'Type 2 Diabetes'],
-      emergencyName: 'Bilal Khan',
-      emergencyPhone: '+92 3••••••88',
+      gender: gender ?? '—',
+      blood: (ext['blood_group'] ?? bloodGroup ?? '—').toString(),
+      phoneMasked: maskedPhone.isEmpty ? '—' : maskedPhone,
+      allergies: _splitSummary(ext['known_allergies']),
+      chronic: _splitSummary(ext['chronic_conditions_summary']),
+      emergencyName: (ext['emergency_contact_name'] ?? '—').toString(),
+      emergencyPhone: (ext['emergency_contact_phone'] ?? '—').toString(),
     );
   }
 }

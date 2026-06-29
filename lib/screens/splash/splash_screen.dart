@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../controllers/auth_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../common/role_routing.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -54,7 +55,7 @@ class _SplashScreenState extends State<SplashScreen>
     }
     if (!mounted) return;
     if (auth.loggedIn) {
-      context.go('/dashboard');
+      context.go(roleHome(auth.role));
     } else {
       context.go('/onboarding');
     }
@@ -101,7 +102,7 @@ class _SplashScreenState extends State<SplashScreen>
                         child: Column(
                           children: [
                             Text(
-                              'Sehat ID',
+                              'HayaatID',
                               style: AppText.display.copyWith(
                                 color: Colors.white,
                                 fontSize: 30,

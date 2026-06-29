@@ -19,6 +19,7 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _nameCtrl = TextEditingController();
+  final _cnicCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _pwCtrl = TextEditingController();
@@ -28,6 +29,7 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _cnicCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
     _pwCtrl.dispose();
@@ -37,6 +39,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool get _enabled =>
       _nameCtrl.text.trim().isNotEmpty &&
+      _cnicCtrl.text.trim().length == 13 &&
       _phoneCtrl.text.trim().isNotEmpty &&
       _pwCtrl.text.isNotEmpty &&
       _consent;
@@ -55,7 +58,8 @@ class _SignupScreenState extends State<SignupScreen> {
     final authController = context.read<AuthController>();
     final success = await authController.signUp(
       name: _nameCtrl.text.trim(),
-      email: _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : '${_phoneCtrl.text.trim()}@sehatid.com',
+      cnic: _cnicCtrl.text.trim(),
+      email: _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : '${_phoneCtrl.text.trim()}@hayaatid.com',
       password: _pwCtrl.text,
       phone: _phoneCtrl.text.trim(),
     );
@@ -114,6 +118,19 @@ class _SignupScreenState extends State<SignupScreen> {
               _Field(
                 controller: _nameCtrl,
                 hint: 'e.g. Ayesha Khan',
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 16),
+              _Label(text: 'CNIC'),
+              const SizedBox(height: 8),
+              _Field(
+                controller: _cnicCtrl,
+                hint: '13 digits, no dashes',
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(13),
+                ],
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 16),

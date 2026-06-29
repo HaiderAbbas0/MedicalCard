@@ -54,7 +54,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 skeleton: const ShimmerList(count: 4),
                 builder: (ctx) {
                   final records = context.watch<RecordController>();
-                  final list = records.visits;
+                  final list = [...records.visits];
+                  switch (_selected) {
+                    case 1: // Doctor
+                      list.sort((a, b) => a.doctor.toLowerCase().compareTo(b.doctor.toLowerCase()));
+                      break;
+                    case 2: // Hospital
+                      list.sort((a, b) => a.hospital.toLowerCase().compareTo(b.hospital.toLowerCase()));
+                      break;
+                    case 3: // Date (newest first; dates are ISO yyyy-mm-dd)
+                      list.sort((a, b) => b.dateLabel.compareTo(a.dateLabel));
+                      break;
+                  }
                   return ListView(
                     padding: const EdgeInsets.fromLTRB(22, 4, 22, 96),
                     children: [

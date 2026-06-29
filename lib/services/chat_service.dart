@@ -66,13 +66,13 @@ class ChatService {
         Conversation(
           doctorId: 'care',
           initials: 'SC',
-          name: 'Sehat Care Team',
-          last: 'Welcome to Sehat ID 👋',
+          name: 'Hayaat Care Team',
+          last: 'Welcome to HayaatID 👋',
           time: 'Mon',
           unread: 0,
           online: false,
           messages: [
-            ChatMessage(text: 'Welcome to Sehat ID 👋 We’re here if you need anything.', fromMe: false, time: 'Mon'),
+            ChatMessage(text: 'Welcome to HayaatID 👋 We’re here if you need anything.', fromMe: false, time: 'Mon'),
           ],
         ),
       ];

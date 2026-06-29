@@ -23,6 +23,9 @@ class AuthController extends ChangeNotifier {
   bool get bootstrapped => _bootstrapped;
   bool get loggedIn => isAuthenticated;
 
+  /// Current user's role (defaults to patient when unknown).
+  UserRole get role => _currentUser?.role ?? UserRole.patient;
+
   AuthController({AuthService? authService}) 
       : _authService = authService ?? AuthService();
 
@@ -103,6 +106,7 @@ class AuthController extends ChangeNotifier {
     required String name,
     required String email,
     required String password,
+    String? cnic,
     String? phone,
     String? dob,
     String? gender,
@@ -116,6 +120,7 @@ class AuthController extends ChangeNotifier {
         name: name,
         email: email,
         password: password,
+        cnic: cnic,
         phone: phone,
         dob: dob,
         gender: gender,
@@ -140,6 +145,13 @@ class AuthController extends ChangeNotifier {
       _setLoading(false);
       return false;
     }
+  }
+
+  /// Replace the cached current user (e.g. after a profile update) and persist it.
+  Future<void> updateCurrentUser(UserModel user) async {
+    _currentUser = user;
+    await _saveUser(user);
+    notifyListeners();
   }
 
   /// Log out the user and clear storage.

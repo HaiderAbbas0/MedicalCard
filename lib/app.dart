@@ -18,7 +18,7 @@ class SehatIdApp extends StatelessWidget {
     final lang = context.watch<LanguageProvider>();
 
     return MaterialApp.router(
-      title: 'SehatID',
+      title: 'HayaatID',
       debugShowCheckedModeBanner: false,
       themeMode: theme.mode,
       theme: AppTheme.light(),

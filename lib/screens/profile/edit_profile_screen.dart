@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../../controllers/auth_controller.dart';
 import '../../data/mock_data.dart';
+import '../../models/auth_model.dart';
+import '../../services/patient_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/gradient_button.dart';
@@ -20,15 +22,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _emergencyCtrl;
+  late final TextEditingController _emergencyPhoneCtrl;
+  bool _busy = false;
 
   @override
   void initState() {
     super.initState();
-    final auth = context.read<AuthController>();
-    final user = auth.currentUser;
-    _nameCtrl = TextEditingController(text: user?.name ?? 'Ayesha Khan');
-    _phoneCtrl = TextEditingController(text: user?.phone ?? '+92 3••••••21');
-    _emergencyCtrl = TextEditingController(text: 'Bilal Khan');
+    final user = context.read<AuthController>().currentUser;
+    final ext = user?.extended ?? const {};
+    _nameCtrl = TextEditingController(text: user?.name ?? '');
+    _phoneCtrl = TextEditingController(text: user?.phone ?? '');
+    _emergencyCtrl = TextEditingController(text: (ext['emergency_contact_name'] ?? '').toString());
+    _emergencyPhoneCtrl = TextEditingController(text: (ext['emergency_contact_phone'] ?? '').toString());
   }
 
   @override
@@ -36,15 +41,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _emergencyCtrl.dispose();
+    _emergencyPhoneCtrl.dispose();
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
+    final auth = context.read<AuthController>();
     final messenger = ScaffoldMessenger.of(context);
-    context.pop();
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Profile updated')));
+    setState(() => _busy = true);
+    try {
+      final updated = await PatientService(auth.token ?? '').updateProfile({
+        'full_name': _nameCtrl.text.trim(),
+        'phone_primary': _phoneCtrl.text.trim(),
+        'emergency_contact_name': _emergencyCtrl.text.trim(),
+        'emergency_contact_phone': _emergencyPhoneCtrl.text.trim(),
+      });
+      await auth.updateCurrentUser(UserModel.fromJson(updated));
+      if (!mounted) return;
+      context.pop();
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Profile updated')));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Update failed: $e'), backgroundColor: Colors.red[800]));
+    }
   }
 
   @override
@@ -141,9 +165,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       const SizedBox(width: 14),
                       Expanded(
                         child: _Field(
-                            label: 'Emergency', controller: _emergencyCtrl),
+                            label: 'Emergency name', controller: _emergencyCtrl),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 16),
+                  _Field(
+                    label: 'Emergency phone',
+                    controller: _emergencyPhoneCtrl,
+                    keyboardType: TextInputType.phone,
                   ),
                 ],
               ),
@@ -152,7 +182,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               padding: const EdgeInsets.fromLTRB(22, 8, 22, 16),
               child: GradientButton(
                 label: 'Save changes',
-                onPressed: _save,
+                loading: _busy,
+                onPressed: _busy ? null : _save,
               ),
             ),
           ],

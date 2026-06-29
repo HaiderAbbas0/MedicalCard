@@ -7,6 +7,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/gradient_button.dart';
 import '../../widgets/common/press_scale.dart';
+import '../common/role_routing.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -41,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _pwCtrl.text,
     );
     if (success && mounted) {
-      context.go('/dashboard');
+      context.go(roleHome(authController.role));
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -81,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: AppText.display.copyWith(color: c.text, fontSize: 26)),
               const SizedBox(height: 6),
               Text(
-                'Sign in to your Sehat ID account',
+                'Sign in to your HayaatID account',
                 style: AppText.body.copyWith(color: c.text2),
               ),
               const SizedBox(height: 22),
@@ -90,12 +91,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 onChanged: (v) => setState(() => _isPatient = v),
               ),
               const SizedBox(height: 20),
-              _FieldLabel('Email or Phone'),
+              _FieldLabel('CNIC, Email or Phone'),
               const SizedBox(height: 8),
               _Field(
                 controller: _idCtrl,
                 icon: Icons.mail_outline_rounded,
-                hint: 'you@email.com  ·  03XX XXXXXXX',
+                hint: '13-digit CNIC  ·  you@email.com',
                 hasError: idEmpty,
                 keyboardType: TextInputType.emailAddress,
                 onChanged: (_) {
@@ -176,6 +177,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: PressScale(
+                  onTap: () => context.push('/signup-doctor'),
+                  semanticLabel: 'Register as a doctor',
+                  child: Text(
+                    'Are you a doctor? Register here',
+                    style: AppText.caption.copyWith(color: c.primary, fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ],

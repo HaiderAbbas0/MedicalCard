@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 
-/// Light & dark [ThemeData] for SehatID.
+/// Light & dark [ThemeData] for HayaatID.
 class AppTheme {
   AppTheme._();
 

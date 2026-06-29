@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/auth_controller.dart';
+import '../../controllers/record_controller.dart';
 import '../../data/mock_data.dart';
+import '../../models/record_models.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/health_card_widget.dart';
@@ -18,34 +20,39 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
+    final rec = context.watch<RecordController>();
     final p = auth.currentUser?.toPatient() ?? mockPatient;
 
     return Scaffold(
       backgroundColor: context.c.bg,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-          children: [
-            _greeting(context, p),
-            const SizedBox(height: 18),
-            HealthCardWidget(
-              patient: p,
-              onShow: () => context.push('/card'),
-            ),
-            const SizedBox(height: 20),
-            _stats(context),
-            const SizedBox(height: 20),
-            _quickActions(context),
-            const SizedBox(height: 24),
-            _recentHeader(context),
-            const SizedBox(height: 12),
-            FakeLoader(
-              skeleton: Column(
-                children: const [ShimmerListCard(), ShimmerListCard()],
+        child: RefreshIndicator(
+          onRefresh: () async {
+            final token = auth.token;
+            if (token != null) await rec.loadRecords(token);
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            children: [
+              _greeting(context, p),
+              const SizedBox(height: 18),
+              HealthCardWidget(
+                patient: p,
+                onShow: () => context.push('/card'),
               ),
-              builder: _recentCard,
-            ),
-          ],
+              const SizedBox(height: 20),
+              _stats(context, rec, p),
+              const SizedBox(height: 20),
+              _quickActions(context),
+              const SizedBox(height: 24),
+              _recentHeader(context),
+              const SizedBox(height: 12),
+              if (rec.isLoading)
+                Column(children: const [ShimmerListCard(), ShimmerListCard()])
+              else
+                _recentCard(context, rec),
+            ],
+          ),
         ),
       ),
     );
@@ -129,9 +136,27 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  // ── 2×2 stats grid ────────────────────────────────────────────────────
-  Widget _stats(BuildContext context) {
+  // ── 2×2 stats grid (live) ─────────────────────────────────────────────
+  Widget _stats(BuildContext context, RecordController rec, Patient p) {
     final c = context.c;
+
+    final medPreview = rec.activePrescriptions
+        .take(4)
+        .map((m) => StatPreviewItem(text: '${m.name} (${m.strength})', color: m.warn != null ? c.danger : c.safe))
+        .toList();
+
+    final allergyPreview = rec.allergies
+        .take(4)
+        .map((a) => StatPreviewItem(text: (a['substance_name'] ?? '').toString()))
+        .toList();
+
+    final visitPreview = rec.visits
+        .take(6)
+        .map((v) => StatPreviewItem(text: '${v.specialty} · ${v.dateLabel}'))
+        .toList();
+
+    final next = rec.nextAppointment;
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -143,55 +168,52 @@ class DashboardScreen extends StatelessWidget {
         _StatCard(
           dot: c.safe,
           label: 'Active Meds',
-          value: '$kActiveMeds',
-          sub: '2 due today',
-          previewItems: [
-            StatPreviewItem(text: 'Amlodipine (5mg)', color: c.danger),
-            StatPreviewItem(text: 'Aspirin (75mg)', color: c.danger),
-            StatPreviewItem(text: 'Metformin (500mg)', color: c.safe),
-            StatPreviewItem(text: 'Pantoprazole (40mg)', color: c.safe),
-          ],
+          value: '${rec.activeMedsCount}',
+          sub: rec.activeMedsCount == 0 ? 'None active' : 'Tap to view',
+          previewItems: medPreview,
           onTap: () => context.go('/prescriptions'),
         ),
         _StatCard(
           dot: c.danger,
           label: 'Allergies',
-          value: '$kAllergyCount',
+          value: '${rec.allergyCount}',
           valueColor: c.danger,
-          sub: 'Penicillin · Sulfa',
-          previewItems: const [
-            StatPreviewItem(text: 'Penicillin'),
-            StatPreviewItem(text: 'Sulfa drugs'),
-          ],
+          sub: rec.allergyCount == 0 ? 'None recorded' : 'Tap to view',
+          previewItems: allergyPreview,
+          onTap: () => context.push('/my-allergies'),
         ),
         _StatCard(
           dot: c.info,
           label: 'Recent Visits',
-          value: '$kRecentVisits',
-          sub: 'last 6 months',
-          previewItems: const [
-            StatPreviewItem(text: 'Cardiology · 18 Jun'),
-            StatPreviewItem(text: 'Endocrinology · 02 May'),
-            StatPreviewItem(text: 'Cardiology · 21 Mar'),
-            StatPreviewItem(text: 'Gen Medicine · 09 Feb'),
-            StatPreviewItem(text: 'Ophthalmology · 15 Jan'),
-            StatPreviewItem(text: 'Dental · 05 Dec'),
-            StatPreviewItem(text: 'Orthopedics · 12 Nov'),
-          ],
+          value: '${rec.recentVisitsCount}',
+          sub: 'All time',
+          previewItems: visitPreview,
           onTap: () => context.go('/history'),
         ),
         _StatCard(
           dot: c.primary,
           label: 'Next Appt',
-          value: '24 Jun',
-          sub: 'Dr. Imran',
-          previewItems: const [
-            StatPreviewItem(text: 'Dr. Imran Yousuf'),
-            StatPreviewItem(text: 'Shifa Hospital'),
-          ],
+          value: next == null ? '—' : _shortDate(next.date),
+          sub: next?.doctorName ?? 'None booked',
+          previewItems: next == null
+              ? const []
+              : [
+                  StatPreviewItem(text: next.doctorName ?? ''),
+                  if (next.clinicName != null) StatPreviewItem(text: next.clinicName!),
+                  StatPreviewItem(text: '${next.date} · ${next.time}'),
+                ],
+          onTap: () => context.push('/my-appointments'),
         ),
       ],
     );
+  }
+
+  /// Format an ISO date (YYYY-MM-DD) as e.g. "06 Jul".
+  String _shortDate(String iso) {
+    final d = DateTime.tryParse(iso);
+    if (d == null) return iso;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${d.day.toString().padLeft(2, '0')} ${months[d.month - 1]}';
   }
 
   // ── Quick actions ─────────────────────────────────────────────────────
@@ -201,6 +223,18 @@ class DashboardScreen extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
+          _QuickAction(
+            icon: Icons.search_rounded,
+            label: 'Find Dr',
+            onTap: () => context.push('/find-doctor'),
+          ),
+          const SizedBox(width: 13),
+          _QuickAction(
+            icon: Icons.event_available_outlined,
+            label: 'Appts',
+            onTap: () => context.push('/my-appointments'),
+          ),
+          const SizedBox(width: 13),
           _QuickAction(
             icon: Icons.history_rounded,
             label: 'History',
@@ -307,8 +341,23 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _recentCard(BuildContext context) {
+  Widget _recentCard(BuildContext context, RecordController rec) {
     final c = context.c;
+    final recent = rec.visits.take(3).toList();
+
+    if (recent.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: c.border),
+        ),
+        child: Text('No visits yet.', style: AppText.body.copyWith(color: c.text3)),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: c.surface,
@@ -318,21 +367,20 @@ class DashboardScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (var i = 0; i < mockRecentActivity.length; i++) ...[
+          for (var i = 0; i < recent.length; i++) ...[
             if (i > 0) Divider(height: 1, thickness: 1, color: c.border2),
-            _recentRow(context, i),
+            _recentRow(context, recent[i]),
           ],
         ],
       ),
     );
   }
 
-  Widget _recentRow(BuildContext context, int i) {
+  Widget _recentRow(BuildContext context, VisitModel v) {
     final c = context.c;
-    final a = mockRecentActivity[i];
     return PressScale(
-      onTap: () => context.push('/history/${mockVisits[i].id}'),
-      semanticLabel: a.dx,
+      onTap: () => context.push('/history/${v.id}'),
+      semanticLabel: v.dx,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
@@ -350,14 +398,14 @@ class DashboardScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    a.dx,
+                    v.dx,
                     style: AppText.bodyStrong.copyWith(color: c.text, fontSize: 14),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    '${a.doctor} · ${a.specialty}',
+                    '${v.doctor} · ${v.specialty}',
                     style: AppText.caption.copyWith(color: c.text2, fontSize: 12),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -366,7 +414,7 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            Text(a.date, style: AppText.small.copyWith(color: c.text3)),
+            Text(v.dateLabel, style: AppText.small.copyWith(color: c.text3)),
           ],
         ),
       ),
