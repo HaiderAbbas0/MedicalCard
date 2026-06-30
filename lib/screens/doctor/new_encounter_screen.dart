@@ -30,6 +30,14 @@ class _NewEncounterScreenState extends State<NewEncounterScreen> {
   final List<String> _labOrders = [];
   List<Map<String, dynamic>> _labs = [];
 
+  String _specialty = 'General Medicine';
+  static const _specialties = [
+    'General Medicine', 'Cardiology', 'Dermatology', 'Pediatrics',
+    'Gynecology & Obstetrics', 'Orthopedics', 'ENT', 'Ophthalmology',
+    'Neurology', 'Psychiatry', 'Gastroenterology', 'Pulmonology',
+    'Endocrinology', 'Urology', 'Nephrology', 'Oncology', 'Dentistry',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -70,11 +78,57 @@ class _NewEncounterScreenState extends State<NewEncounterScreen> {
   }
 
   Future<void> _addMedication() async {
-    final value = await _prompt('Prescribe medication', 'Medication name');
-    if (value == null || value.isEmpty || _encounterId == null) return;
+    if (_encounterId == null) return;
+    final nameCtrl = TextEditingController();
+    final strengthCtrl = TextEditingController();
+    final durationCtrl = TextEditingController();
+    bool morning = false, afternoon = false, evening = false, night = false;
+    final c = context.c;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setLocal) => AlertDialog(
+          title: const Text('Prescribe medication'),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              TextField(controller: nameCtrl, autofocus: true, decoration: const InputDecoration(hintText: 'Medication name (e.g. Amoxicillin)')),
+              const SizedBox(height: 10),
+              TextField(controller: strengthCtrl, decoration: const InputDecoration(hintText: 'Strength (e.g. 500mg)')),
+              const SizedBox(height: 10),
+              TextField(controller: durationCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'Duration in days (e.g. 7)')),
+              const SizedBox(height: 14),
+              Text('When to take', style: TextStyle(color: c.text2, fontWeight: FontWeight.w700, fontSize: 13)),
+              const SizedBox(height: 4),
+              CheckboxListTile(dense: true, contentPadding: EdgeInsets.zero, value: morning, title: const Text('Morning'), onChanged: (v) => setLocal(() => morning = v ?? false)),
+              CheckboxListTile(dense: true, contentPadding: EdgeInsets.zero, value: afternoon, title: const Text('Afternoon'), onChanged: (v) => setLocal(() => afternoon = v ?? false)),
+              CheckboxListTile(dense: true, contentPadding: EdgeInsets.zero, value: evening, title: const Text('Evening'), onChanged: (v) => setLocal(() => evening = v ?? false)),
+              CheckboxListTile(dense: true, contentPadding: EdgeInsets.zero, value: night, title: const Text('Night'), onChanged: (v) => setLocal(() => night = v ?? false)),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Prescribe')),
+          ],
+        ),
+      ),
+    );
+    final name = nameCtrl.text.trim();
+    if (ok != true || name.isEmpty) return;
     await _run(() async {
-      final res = await widget.service.addMedication(_encounterId!, value);
-      setState(() => _medications.add(value));
+      final res = await widget.service.addMedication(
+        _encounterId!,
+        name,
+        dosageUnit: strengthCtrl.text.trim().isEmpty ? null : strengthCtrl.text.trim(),
+        durationDays: int.tryParse(durationCtrl.text.trim()),
+        morning: morning,
+        afternoon: afternoon,
+        evening: evening,
+        night: night,
+      );
+      final times = [if (morning) 'Morning', if (afternoon) 'Afternoon', if (evening) 'Evening', if (night) 'Night'];
+      final label = '$name${strengthCtrl.text.trim().isNotEmpty ? ' ${strengthCtrl.text.trim()}' : ''}'
+          '${times.isNotEmpty ? ' · ${times.join(', ')}' : ''}';
+      setState(() => _medications.add(label));
       final warning = res['allergy_warning'];
       if (warning != null && mounted) {
         showDialog(
@@ -158,7 +212,7 @@ class _NewEncounterScreenState extends State<NewEncounterScreen> {
     setState(() => _busy = true);
     try {
       // Persist chief complaint + follow-up onto the draft before locking it.
-      final patch = <String, dynamic>{};
+      final patch = <String, dynamic>{'specialty': _specialty};
       if (_chiefCtrl.text.trim().isNotEmpty) patch['chief_complaint'] = _chiefCtrl.text.trim();
       if (_followUpCtrl.text.trim().isNotEmpty) {
         patch['follow_up_required'] = true;
@@ -213,6 +267,20 @@ class _NewEncounterScreenState extends State<NewEncounterScreen> {
                   children: [
                     Text(widget.patient.fullName, style: TextStyle(color: c.text, fontWeight: FontWeight.w800, fontSize: 16)),
                     Text('CNIC ${widget.patient.cnic}', style: TextStyle(color: c.text2)),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      initialValue: _specialty,
+                      decoration: InputDecoration(
+                        labelText: 'Specialty',
+                        filled: true,
+                        fillColor: c.surface,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      items: _specialties
+                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .toList(),
+                      onChanged: (v) => setState(() => _specialty = v ?? _specialty),
+                    ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _chiefCtrl,

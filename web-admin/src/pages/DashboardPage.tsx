@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api/client';
+import { adminApi } from '../api/admin';
 import type { DashboardStats } from '../api/types';
 import { Spinner } from '../components/ui';
+import Icon from '../components/Icon';
 
-const CARDS: { key: keyof DashboardStats; label: string }[] = [
-  { key: 'total_patients', label: 'Registered Patients' },
-  { key: 'approved_doctors', label: 'Approved Doctors' },
-  { key: 'pending_doctor_applications', label: 'Pending Doctor Applications' },
-  { key: 'pending_lab_applications', label: 'Pending Lab Applications' },
-  { key: 'appointments_today', label: 'Appointments Today' },
-  { key: 'pending_lab_orders', label: 'Pending Lab Orders' },
-  { key: 'total_clinics', label: 'Clinics' },
-  { key: 'total_labs', label: 'Diagnostic Labs' },
+const CARDS: { key: keyof DashboardStats; label: string; icon: string; tint: string }[] = [
+  { key: 'total_patients', label: 'Registered Patients', icon: 'patients', tint: 'var(--teal)' },
+  { key: 'approved_doctors', label: 'Approved Doctors', icon: 'doctor', tint: 'var(--blue)' },
+  { key: 'pending_doctor_applications', label: 'Pending Doctor Applications', icon: 'pending', tint: 'var(--amber)' },
+  { key: 'pending_lab_applications', label: 'Pending Lab Applications', icon: 'pending', tint: 'var(--amber)' },
+  { key: 'appointments_today', label: 'Appointments Today', icon: 'calendar', tint: 'var(--teal)' },
+  { key: 'pending_lab_orders', label: 'Pending Lab Orders', icon: 'pill', tint: 'var(--blue)' },
+  { key: 'total_clinics', label: 'Clinics', icon: 'clinic', tint: 'var(--teal)' },
+  { key: 'total_labs', label: 'Diagnostic Labs', icon: 'lab', tint: 'var(--amber)' },
 ];
 
 export default function DashboardPage() {
@@ -20,8 +21,8 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api
-      .get<DashboardStats>('/admin/dashboard')
+    adminApi
+      .dashboard()
       .then(setStats)
       .catch((e) => setError(e.message));
   }, []);
@@ -34,6 +35,9 @@ export default function DashboardPage() {
       <div className="stat-grid">
         {CARDS.map((c) => (
           <div className="stat" key={c.key}>
+            <div className="stat-icon" style={{ color: c.tint, background: `color-mix(in srgb, ${c.tint} 12%, transparent)` }}>
+              <Icon name={c.icon} size={20} />
+            </div>
             <div className="value">{stats[c.key]}</div>
             <div className="label">{c.label}</div>
           </div>

@@ -27,8 +27,9 @@ export default function LoginPage() {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={onSubmit}>
-        <h2>HayaatID Admin</h2>
-        <p className="sub">CNIC Health Card System</p>
+        <img src="/favicon.svg" width={56} height={56} alt="HayaatID" style={{ display: 'block', margin: '0 auto 14px', borderRadius: 14, boxShadow: '0 4px 14px rgba(0,0,0,0.12)' }} />
+        <h2 style={{ textAlign: 'center' }}>HayaatID Admin</h2>
+        <p className="sub" style={{ textAlign: 'center' }}>CNIC Health Card System</p>
 
         <div className="field">
           <label>CNIC or Email</label>

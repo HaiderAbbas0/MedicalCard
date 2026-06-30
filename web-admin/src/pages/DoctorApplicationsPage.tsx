@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
+import { adminApi } from '../api/admin';
 import type { DoctorApplication } from '../api/types';
 import { Spinner, Empty, Modal, StatusBadge } from '../components/ui';
 
@@ -13,8 +13,8 @@ export default function DoctorApplicationsPage() {
 
   function load() {
     setApps(null);
-    api
-      .get<DoctorApplication[]>('/admin/applications/doctors?status=pending')
+    adminApi
+      .doctorApplications('pending')
       .then(setApps)
       .catch((e) => setError(e.message));
   }
@@ -23,7 +23,7 @@ export default function DoctorApplicationsPage() {
   async function approve(app: DoctorApplication) {
     setBusy(true);
     try {
-      await api.post(`/admin/applications/doctors/${app.id}/approve`);
+      await adminApi.approveDoctor(app.id);
       setSelected(null);
       load();
     } catch (e) {
@@ -37,7 +37,7 @@ export default function DoctorApplicationsPage() {
     if (!rejecting || !reason.trim()) return;
     setBusy(true);
     try {
-      await api.post(`/admin/applications/doctors/${rejecting.id}/reject`, { reason: reason.trim() });
+      await adminApi.rejectDoctor(rejecting.id, reason.trim());
       setRejecting(null);
       setReason('');
       setSelected(null);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
+import { adminApi } from '../api/admin';
 import type { Lab } from '../api/types';
 import { Spinner, Empty, Modal } from '../components/ui';
 
@@ -12,8 +12,8 @@ export default function LabApplicationsPage() {
 
   function load() {
     setLabs(null);
-    api
-      .get<Lab[]>('/admin/applications/labs?status=pending')
+    adminApi
+      .labApplications('pending')
       .then(setLabs)
       .catch((e) => setError(e.message));
   }
@@ -22,7 +22,7 @@ export default function LabApplicationsPage() {
   async function approve(lab: Lab) {
     setBusy(true);
     try {
-      await api.post(`/admin/applications/labs/${lab.id}/approve`);
+      await adminApi.approveLab(lab.id);
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed.');
@@ -35,7 +35,7 @@ export default function LabApplicationsPage() {
     if (!rejecting || !reason.trim()) return;
     setBusy(true);
     try {
-      await api.post(`/admin/applications/labs/${rejecting.id}/reject`, { reason: reason.trim() });
+      await adminApi.rejectLab(rejecting.id);
       setRejecting(null);
       setReason('');
       load();

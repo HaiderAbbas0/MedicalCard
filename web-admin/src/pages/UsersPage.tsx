@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
+import { adminApi } from '../api/admin';
 import type { Profile, Role } from '../api/types';
 import { Spinner, Empty, Modal, StatusBadge } from '../components/ui';
 import CreateAccountModal from '../components/CreateAccountModal';
@@ -21,11 +21,8 @@ export default function UsersPage() {
 
   function load() {
     setUsers(null);
-    const params = new URLSearchParams();
-    if (roleFilter) params.set('role', roleFilter);
-    if (q.trim()) params.set('q', q.trim());
-    api
-      .get<Profile[]>(`/admin/users?${params.toString()}`)
+    adminApi
+      .users({ role: roleFilter || undefined, q: q.trim() || undefined })
       .then(setUsers)
       .catch((e) => setError(e.message));
   }
@@ -37,8 +34,11 @@ export default function UsersPage() {
     if (acting.mode === 'suspend' && !reason.trim()) return;
     setBusy(true);
     try {
-      const path = `/admin/users/${acting.user.id}/${acting.mode}`;
-      await api.post(path, { reason: reason.trim() || undefined });
+      if (acting.mode === 'suspend') {
+        await adminApi.suspendUser(acting.user.id, reason.trim());
+      } else {
+        await adminApi.reactivateUser(acting.user.id);
+      }
       setActing(null);
       setReason('');
       load();

@@ -1,13 +1,14 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import Icon from './Icon';
 
 const NAV = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/doctor-applications', label: 'Doctor Applications' },
-  { to: '/lab-applications', label: 'Lab Applications' },
-  { to: '/users', label: 'Users' },
-  { to: '/clinics', label: 'Clinics' },
-  { to: '/audit', label: 'Audit Log' },
+  { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { to: '/doctor-applications', label: 'Doctor Applications', icon: 'doctor' },
+  { to: '/lab-applications', label: 'Lab Applications', icon: 'lab' },
+  { to: '/users', label: 'Users', icon: 'users' },
+  { to: '/clinics', label: 'Clinics', icon: 'clinic' },
+  { to: '/audit', label: 'Audit Log', icon: 'audit' },
 ];
 
 const TITLES: Record<string, string> = {
@@ -33,7 +34,7 @@ export default function Layout() {
         <nav>
           {NAV.map((n) => (
             <NavLink key={n.to} to={n.to} className={({ isActive }) => (isActive ? 'active' : '')}>
-              {n.label}
+              <span className="nav-row"><Icon name={n.icon} /> {n.label}</span>
             </NavLink>
           ))}
         </nav>

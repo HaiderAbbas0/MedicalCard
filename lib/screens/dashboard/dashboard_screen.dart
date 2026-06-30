@@ -4,11 +4,12 @@ import 'package:provider/provider.dart';
 
 import '../../controllers/auth_controller.dart';
 import '../../controllers/record_controller.dart';
+import '../../controllers/card_controller.dart';
 import '../../data/mock_data.dart';
 import '../../models/record_models.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
-import '../../widgets/common/health_card_widget.dart';
+import '../../widgets/common/hayaat_card.dart';
 import '../../widgets/common/icon_badge.dart';
 import '../../widgets/common/press_scale.dart';
 import '../../widgets/common/shimmer_loader.dart';
@@ -21,6 +22,7 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
     final rec = context.watch<RecordController>();
+    final cardCtrl = context.watch<CardController>();
     final p = auth.currentUser?.toPatient() ?? mockPatient;
 
     return Scaffold(
@@ -36,10 +38,7 @@ class DashboardScreen extends StatelessWidget {
             children: [
               _greeting(context, p),
               const SizedBox(height: 18),
-              HealthCardWidget(
-                patient: p,
-                onShow: () => context.push('/card'),
-              ),
+              _cardSection(context, cardCtrl),
               const SizedBox(height: 20),
               _stats(context, rec, p),
               const SizedBox(height: 20),
@@ -136,6 +135,52 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
+  // ── HayaatID card (virtual) or request CTA ────────────────────────────
+  Widget _cardSection(BuildContext context, CardController cardCtrl) {
+    if (cardCtrl.card != null) {
+      return GestureDetector(
+        onTap: () => context.push('/card'),
+        child: HayaatCard(card: cardCtrl.card!, gender: context.read<AuthController>().currentUser?.gender),
+      );
+    }
+    return GestureDetector(
+      onTap: () => context.push('/card-request'),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: brandGradient(context),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppShadows.brandCard,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(14)),
+              child: const Icon(Icons.add_card_rounded, color: Colors.white, size: 26),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Request your HayaatID card',
+                      style: AppText.bodyStrong.copyWith(color: Colors.white, fontSize: 16)),
+                  const SizedBox(height: 4),
+                  Text('Get your unique health ID and digital card.',
+                      style: AppText.caption.copyWith(color: Colors.white.withValues(alpha: 0.9))),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Colors.white),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── 2×2 stats grid (live) ─────────────────────────────────────────────
   Widget _stats(BuildContext context, RecordController rec, Patient p) {
     final c = context.c;
@@ -224,12 +269,6 @@ class DashboardScreen extends StatelessWidget {
       child: Row(
         children: [
           _QuickAction(
-            icon: Icons.search_rounded,
-            label: 'Find Dr',
-            onTap: () => context.push('/find-doctor'),
-          ),
-          const SizedBox(width: 13),
-          _QuickAction(
             icon: Icons.event_available_outlined,
             label: 'Appts',
             onTap: () => context.push('/my-appointments'),
@@ -245,6 +284,12 @@ class DashboardScreen extends StatelessWidget {
             icon: Icons.medication_outlined,
             label: 'Rx',
             onTap: () => context.go('/prescriptions'),
+          ),
+          const SizedBox(width: 13),
+          _QuickAction(
+            icon: Icons.alarm_rounded,
+            label: 'Reminders',
+            onTap: () => context.push('/reminders'),
           ),
           const SizedBox(width: 13),
           _QuickAction(

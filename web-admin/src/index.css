@@ -123,3 +123,11 @@ button { font-family: inherit; cursor: pointer; }
 .center { display: grid; place-items: center; padding: 60px; }
 .mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; }
 .section-title { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+
+/* Sidebar nav rows with icons */
+.nav-row { display: inline-flex; align-items: center; gap: 11px; }
+.nav-row svg { flex: none; opacity: 0.9; }
+/* Stat card icon badge */
+.stat { position: relative; }
+.stat .stat-icon { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 12px; }
+.stat .value { font-size: 28px; }

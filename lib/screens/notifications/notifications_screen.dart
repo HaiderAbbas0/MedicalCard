@@ -21,13 +21,40 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
   late final PatientService _service;
-  Future<List<Map<String, dynamic>>>? _future;
+  List<Map<String, dynamic>> _items = [];
+  bool _loading = true;
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
     _service = PatientService(context.read<AuthController>().token ?? '');
-    _future = _service.notifications();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final items = await _service.notifications();
+      if (mounted) setState(() { _items = items; _loading = false; _error = null; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e; _loading = false; });
+    }
+  }
+
+  Future<void> _markRead(Map<String, dynamic> n) async {
+    if (n['is_read'] == true) return;
+    setState(() => n['is_read'] = true);
+    try {
+      await _service.markNotificationRead(n['id'].toString());
+    } catch (_) {}
+  }
+
+  Future<void> _markAllRead() async {
+    setState(() { for (final n in _items) n['is_read'] = true; });
+    try {
+      await _service.markAllNotificationsRead();
+    } catch (_) {}
   }
 
   (IconData, Color, Color) _style(BuildContext context, String type) {
@@ -80,27 +107,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text('Notifications',
-                      style: AppText.heading.copyWith(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
+                  Expanded(
+                    child: Text('Notifications',
+                        style: AppText.heading.copyWith(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
+                  ),
+                  if (_items.any((n) => n['is_read'] == false))
+                    PressScale(
+                      onTap: _markAllRead,
+                      semanticLabel: 'Mark all read',
+                      child: Text('Mark all read',
+                          style: AppText.caption.copyWith(fontWeight: FontWeight.w700, color: c.primary)),
+                    ),
                 ],
               ),
             ),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: () async => setState(() => _future = _service.notifications()),
-                child: FutureBuilder<List<Map<String, dynamic>>>(
-                  future: _future,
-                  builder: (context, snap) {
-                    if (snap.connectionState == ConnectionState.waiting) {
+                onRefresh: _load,
+                child: Builder(
+                  builder: (context) {
+                    if (_loading) {
                       return const Center(child: CircularProgressIndicator());
                     }
-                    if (snap.hasError) {
+                    if (_error != null) {
                       return ListView(children: [
                         const SizedBox(height: 120),
-                        Center(child: Text('${snap.error}', style: TextStyle(color: c.danger))),
+                        Center(child: Text('$_error', style: TextStyle(color: c.danger))),
                       ]);
                     }
-                    final items = snap.data ?? [];
+                    final items = _items;
                     if (items.isEmpty) {
                       return ListView(children: [
                         const SizedBox(height: 140),
@@ -115,42 +150,47 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         final n = items[i];
                         final (icon, fg, bg) = _style(context, n['type']?.toString() ?? '');
                         final created = n['created_at']?.toString() ?? '';
-                        return AppCard(
-                          radius: 16,
-                          padding: const EdgeInsets.all(14),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-                                child: Icon(icon, color: fg, size: 20),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(n['title']?.toString() ?? '',
-                                        style: AppText.body.copyWith(fontSize: 14, fontWeight: FontWeight.w800, color: c.text)),
-                                    const SizedBox(height: 3),
-                                    Text(n['body']?.toString() ?? '',
-                                        style: AppText.caption.copyWith(fontSize: 12.5, height: 1.4, color: c.text2)),
-                                    const SizedBox(height: 6),
-                                    Text(created.length >= 10 ? created.substring(0, 10) : created,
-                                        style: AppText.small.copyWith(fontSize: 11, color: c.text3)),
-                                  ],
-                                ),
-                              ),
-                              if (n['is_read'] == false)
+                        final unread = n['is_read'] == false;
+                        return PressScale(
+                          onTap: () => _markRead(n),
+                          semanticLabel: n['title']?.toString() ?? 'Notification',
+                          child: AppCard(
+                            radius: 16,
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(color: c.primary, shape: BoxShape.circle),
+                                  width: 40,
+                                  height: 40,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+                                  child: Icon(icon, color: fg, size: 20),
                                 ),
-                            ],
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(n['title']?.toString() ?? '',
+                                          style: AppText.body.copyWith(fontSize: 14, fontWeight: FontWeight.w800, color: c.text)),
+                                      const SizedBox(height: 3),
+                                      Text(n['body']?.toString() ?? '',
+                                          style: AppText.caption.copyWith(fontSize: 12.5, height: 1.4, color: c.text2)),
+                                      const SizedBox(height: 6),
+                                      Text(created.length >= 10 ? created.substring(0, 10) : created,
+                                          style: AppText.small.copyWith(fontSize: 11, color: c.text3)),
+                                    ],
+                                  ),
+                                ),
+                                if (unread)
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(color: c.primary, shape: BoxShape.circle),
+                                  ),
+                              ],
+                            ),
                           ),
                         );
                       },

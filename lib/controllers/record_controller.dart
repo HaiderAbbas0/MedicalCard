@@ -16,7 +16,10 @@ class RecordController extends ChangeNotifier {
   List<AppointmentModel> _appointments = [];
 
   bool _isLoading = false;
+  bool _loaded = false;
   String? _errorMessage;
+  String? _token;
+  bool get loaded => _loaded;
 
   // Raw collections
   List<VisitModel> get visits => _visits;
@@ -49,8 +52,12 @@ class RecordController extends ChangeNotifier {
 
   RecordController({RecordService? service}) : _service = service ?? RecordService();
 
+  /// Re-loads using the last token (for pull-to-refresh / retry).
+  Future<void> refresh() => loadRecords(_token ?? '');
+
   /// Loads everything the patient app needs in parallel.
   Future<void> loadRecords(String token) async {
+    _token = token;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -74,6 +81,7 @@ class RecordController extends ChangeNotifier {
       _errorMessage = 'Failed to load medical records: $e';
     } finally {
       _isLoading = false;
+      _loaded = true;
       notifyListeners();
     }
   }
@@ -84,6 +92,7 @@ class RecordController extends ChangeNotifier {
     _reports = [];
     _allergies = [];
     _appointments = [];
+    _loaded = false;
     _errorMessage = null;
     notifyListeners();
   }

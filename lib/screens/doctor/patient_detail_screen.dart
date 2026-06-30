@@ -34,28 +34,45 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   Future<void> _recordAllergy() async {
     final substanceCtrl = TextEditingController();
     final reactionCtrl = TextEditingController();
+    final triggerCtrl = TextEditingController();
     String criticality = 'high';
+    String severity = 'moderate';
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setLocal) => AlertDialog(
           title: const Text('Record allergy'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: substanceCtrl, autofocus: true, decoration: const InputDecoration(hintText: 'Substance (e.g. Penicillin)')),
-            const SizedBox(height: 12),
-            TextField(controller: reactionCtrl, decoration: const InputDecoration(hintText: 'Reaction (optional)')),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: criticality,
-              decoration: const InputDecoration(labelText: 'Criticality'),
-              items: const [
-                DropdownMenuItem(value: 'low', child: Text('Low')),
-                DropdownMenuItem(value: 'high', child: Text('High')),
-                DropdownMenuItem(value: 'unable_to_assess', child: Text('Unable to assess')),
-              ],
-              onChanged: (v) => setLocal(() => criticality = v ?? criticality),
-            ),
-          ]),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(controller: substanceCtrl, autofocus: true, decoration: const InputDecoration(hintText: 'Substance (e.g. Penicillin)')),
+              const SizedBox(height: 12),
+              TextField(controller: reactionCtrl, decoration: const InputDecoration(hintText: 'Reaction (e.g. Rash, swelling)')),
+              const SizedBox(height: 12),
+              TextField(controller: triggerCtrl, decoration: const InputDecoration(hintText: 'Trigger / notes (optional)')),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: severity,
+                decoration: const InputDecoration(labelText: 'Severity'),
+                items: const [
+                  DropdownMenuItem(value: 'mild', child: Text('Mild')),
+                  DropdownMenuItem(value: 'moderate', child: Text('Moderate')),
+                  DropdownMenuItem(value: 'severe', child: Text('Severe')),
+                ],
+                onChanged: (v) => setLocal(() => severity = v ?? severity),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: criticality,
+                decoration: const InputDecoration(labelText: 'Criticality'),
+                items: const [
+                  DropdownMenuItem(value: 'low', child: Text('Low')),
+                  DropdownMenuItem(value: 'high', child: Text('High')),
+                  DropdownMenuItem(value: 'unable_to_assess', child: Text('Unable to assess')),
+                ],
+                onChanged: (v) => setLocal(() => criticality = v ?? criticality),
+              ),
+            ]),
+          ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
@@ -69,7 +86,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           widget.patient.id,
           substanceCtrl.text.trim(),
           criticality: criticality,
+          severity: severity,
           reaction: reactionCtrl.text.trim().isEmpty ? null : reactionCtrl.text.trim(),
+          triggerNote: triggerCtrl.text.trim().isEmpty ? null : triggerCtrl.text.trim(),
         );
         setState(() => _allergies.add({'substance_name': substanceCtrl.text.trim(), 'criticality': criticality}));
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Allergy recorded.')));

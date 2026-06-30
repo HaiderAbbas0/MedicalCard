@@ -3,6 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { doctorApi } from '../../api/doctor';
 import { Spinner } from '../../components/ui';
 
+const SPECIALTIES = [
+  'General Medicine', 'Cardiology', 'Dermatology', 'Pediatrics',
+  'Gynecology & Obstetrics', 'Orthopedics', 'ENT', 'Ophthalmology',
+  'Neurology', 'Psychiatry', 'Gastroenterology', 'Pulmonology',
+  'Endocrinology', 'Urology', 'Nephrology', 'Oncology', 'Dentistry',
+];
+
 export default function NewEncounterPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
@@ -14,6 +21,7 @@ export default function NewEncounterPage() {
 
   const [chief, setChief] = useState('');
   const [followUp, setFollowUp] = useState('');
+  const [specialty, setSpecialty] = useState('General Medicine');
   const [diagnoses, setDiagnoses] = useState<string[]>([]);
   const [meds, setMeds] = useState<string[]>([]);
   const [vitals, setVitals] = useState<string[]>([]);
@@ -23,6 +31,9 @@ export default function NewEncounterPage() {
 
   const [dxInput, setDxInput] = useState('');
   const [medInput, setMedInput] = useState('');
+  const [medStrength, setMedStrength] = useState('');
+  const [medDuration, setMedDuration] = useState('');
+  const [medTimes, setMedTimes] = useState({ morning: false, afternoon: false, evening: false, night: false });
   const [vitalName, setVitalName] = useState('');
   const [vitalValue, setVitalValue] = useState('');
   const [testInput, setTestInput] = useState('');
@@ -56,9 +67,24 @@ export default function NewEncounterPage() {
   async function addMed() {
     if (!medInput.trim() || !encounterId) return;
     await run(async () => {
-      const res = await doctorApi.addMedication(encounterId, { medication_name: medInput.trim() });
-      setMeds((m) => [...m, medInput.trim()]);
+      const res = await doctorApi.addMedication(encounterId, {
+        medication_name: medInput.trim(),
+        dosage_unit: medStrength.trim() || undefined,
+        duration_days: medDuration.trim() ? Number(medDuration.trim()) : undefined,
+        dose_morning: medTimes.morning,
+        dose_afternoon: medTimes.afternoon,
+        dose_evening: medTimes.evening,
+        dose_night: medTimes.night,
+      });
+      const times = (['morning', 'afternoon', 'evening', 'night'] as const)
+        .filter((t) => medTimes[t])
+        .map((t) => t[0].toUpperCase() + t.slice(1));
+      const label = `${medInput.trim()}${medStrength.trim() ? ` ${medStrength.trim()}` : ''}${times.length ? ` · ${times.join(', ')}` : ''}`;
+      setMeds((m) => [...m, label]);
       setMedInput('');
+      setMedStrength('');
+      setMedDuration('');
+      setMedTimes({ morning: false, afternoon: false, evening: false, night: false });
       if (res.allergy_warning) setWarning(res.allergy_warning);
     });
   }
@@ -86,7 +112,7 @@ export default function NewEncounterPage() {
     if (!encounterId) return;
     setBusy(true);
     try {
-      const patch: Record<string, unknown> = {};
+      const patch: Record<string, unknown> = { specialty };
       if (chief.trim()) patch.chief_complaint = chief.trim();
       if (followUp.trim()) { patch.follow_up_required = true; patch.follow_up_date = followUp.trim(); }
       if (Object.keys(patch).length) await doctorApi.updateEncounter(encounterId, patch);
@@ -114,6 +140,11 @@ export default function NewEncounterPage() {
       )}
 
       <div className="card card-pad" style={{ marginTop: 16 }}>
+        <div className="field"><label>Specialty</label>
+          <select className="select" value={specialty} onChange={(e) => setSpecialty(e.target.value)}>
+            {SPECIALTIES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
         <div className="field"><label>Chief complaint</label>
           <textarea className="input" rows={2} value={chief} onChange={(e) => setChief(e.target.value)} /></div>
       </div>
@@ -128,7 +159,18 @@ export default function NewEncounterPage() {
       <Section title="Medications" items={meds}>
         <div className="row">
           <input className="input" placeholder="Medication name" value={medInput} onChange={(e) => setMedInput(e.target.value)} />
-          <button className="btn btn-ghost" onClick={addMed}>Add</button>
+          <input className="input" style={{ maxWidth: 140 }} placeholder="Strength (500mg)" value={medStrength} onChange={(e) => setMedStrength(e.target.value)} />
+          <input className="input" style={{ maxWidth: 130 }} placeholder="Days" type="number" value={medDuration} onChange={(e) => setMedDuration(e.target.value)} />
+        </div>
+        <div className="row" style={{ marginTop: 8, gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span className="muted" style={{ fontSize: 13 }}>When to take:</span>
+          {(['morning', 'afternoon', 'evening', 'night'] as const).map((t) => (
+            <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, textTransform: 'capitalize' }}>
+              <input type="checkbox" checked={medTimes[t]} onChange={(e) => setMedTimes((m) => ({ ...m, [t]: e.target.checked }))} />
+              {t}
+            </label>
+          ))}
+          <button className="btn btn-ghost" style={{ marginLeft: 'auto' }} onClick={addMed}>Add medication</button>
         </div>
       </Section>
 

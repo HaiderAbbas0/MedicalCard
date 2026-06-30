@@ -112,6 +112,8 @@ export default function PatientRecordPage() {
 function RecordAllergyModal({ patientId, onClose, onSaved }: { patientId: string; onClose: () => void; onSaved: () => void }) {
   const [substance, setSubstance] = useState('');
   const [reaction, setReaction] = useState('');
+  const [trigger, setTrigger] = useState('');
+  const [severity, setSeverity] = useState('moderate');
   const [criticality, setCriticality] = useState('high');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -120,7 +122,13 @@ function RecordAllergyModal({ patientId, onClose, onSaved }: { patientId: string
     if (!substance.trim()) return setError('Substance is required.');
     setBusy(true);
     try {
-      await doctorApi.recordAllergy(patientId, { substance_name: substance.trim(), reaction_description: reaction.trim() || undefined, criticality });
+      await doctorApi.recordAllergy(patientId, {
+        substance_name: substance.trim(),
+        reaction_description: reaction.trim() || undefined,
+        trigger_note: trigger.trim() || undefined,
+        severity,
+        criticality,
+      });
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed.');
@@ -144,6 +152,15 @@ function RecordAllergyModal({ patientId, onClose, onSaved }: { patientId: string
         <input className="input" value={substance} onChange={(e) => setSubstance(e.target.value)} /></div>
       <div className="field"><label>Reaction</label>
         <input className="input" value={reaction} onChange={(e) => setReaction(e.target.value)} /></div>
+      <div className="field"><label>Trigger / notes</label>
+        <input className="input" value={trigger} onChange={(e) => setTrigger(e.target.value)} /></div>
+      <div className="field"><label>Severity</label>
+        <select className="select" value={severity} onChange={(e) => setSeverity(e.target.value)}>
+          <option value="mild">Mild</option>
+          <option value="moderate">Moderate</option>
+          <option value="severe">Severe</option>
+        </select>
+      </div>
       <div className="field"><label>Criticality</label>
         <select className="select" value={criticality} onChange={(e) => setCriticality(e.target.value)}>
           <option value="high">High</option>

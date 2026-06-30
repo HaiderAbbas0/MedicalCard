@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
+import { adminApi } from '../api/admin';
 import type { Clinic, Lab } from '../api/types';
 import { Modal } from './ui';
 
@@ -41,8 +41,8 @@ export default function CreateAccountModal({
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.get<Clinic[]>('/admin/clinics').then(setClinics).catch(() => undefined);
-    api.get<Lab[]>('/admin/labs').then(setLabs).catch(() => undefined);
+    adminApi.clinics().then(setClinics).catch(() => undefined);
+    adminApi.labs().then(setLabs).catch(() => undefined);
   }, []);
 
   function set(key: string, value: string) {
@@ -55,13 +55,6 @@ export default function CreateAccountModal({
     if (!form.full_name.trim() || !form.password) return setError('Full name and password are required.');
     if (role === 'receptionist' && !form.clinic_id) return setError('Select a clinic for the receptionist.');
     if (role === 'lab_worker' && !form.lab_id) return setError('Select a lab for the lab worker.');
-
-    const path =
-      role === 'receptionist'
-        ? '/admin/users/receptionist'
-        : role === 'lab_worker'
-          ? '/admin/users/lab-worker'
-          : '/admin/users/admin';
 
     const body: Record<string, string> = {
       cnic: form.cnic.trim(),
@@ -76,7 +69,7 @@ export default function CreateAccountModal({
 
     setBusy(true);
     try {
-      await api.post(path, body);
+      await adminApi.createStaff(role, body);
       onCreated();
       onClose();
     } catch (e) {

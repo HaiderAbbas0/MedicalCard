@@ -99,10 +99,10 @@ class _OtpScreenState extends State<OtpScreen> {
                 TextSpan(
                   style: AppText.body.copyWith(color: c.text2),
                   children: [
-                    const TextSpan(text: 'We sent a 6-digit code to '),
+                    const TextSpan(text: 'We sent a 5-digit code to your phone. '),
                     TextSpan(
-                      text: '+92 3•• ••• ••21',
-                      style: AppText.bodyStrong.copyWith(color: c.text),
+                      text: 'Demo code: 11111',
+                      style: AppText.bodyStrong.copyWith(color: c.primary),
                     ),
                   ],
                 ),
@@ -110,6 +110,7 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 30),
               OtpField(
                 key: _key,
+                length: 5,
                 onChanged: (v) => setState(() {
                   _code = v;
                   _error = false;
@@ -127,8 +128,8 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 24),
               GradientButton(
                 label: 'Verify & continue',
-                enabled: _code.length == 6,
-                onPressed: _code.length == 6 ? _verify : null,
+                enabled: _code.length == 5,
+                onPressed: _code.length == 5 ? _verify : null,
               ),
             ],
           ),

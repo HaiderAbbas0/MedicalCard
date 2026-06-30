@@ -134,3 +134,5 @@ button { font-family: inherit; cursor: pointer; }
 .login-wrap { background: linear-gradient(135deg, #1f2a37, #0d7d7d); }
 .role-pill { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700;
   background: var(--teal-light); color: var(--teal-dark); text-transform: capitalize; }
+.nav-row { display: inline-flex; align-items: center; gap: 11px; }
+.nav-row svg { flex: none; opacity: 0.9; }

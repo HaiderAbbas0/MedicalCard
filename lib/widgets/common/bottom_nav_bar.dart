@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../i18n/app_strings.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 
@@ -10,12 +11,12 @@ class ScaffoldWithNav extends StatelessWidget {
   const ScaffoldWithNav({super.key, required this.shell});
 
   static const _items = [
-    _NavItem(Icons.home_rounded, Icons.home_outlined, 'Home'),
+    _NavItem(Icons.home_rounded, Icons.home_outlined, 'nav.home'),
     _NavItem(Icons.access_time_filled_rounded, Icons.access_time_rounded,
-        'History'),
-    _NavItem(Icons.medication_rounded, Icons.medication_outlined, 'Rx'),
-    _NavItem(Icons.description_rounded, Icons.description_outlined, 'Reports'),
-    _NavItem(Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
+        'nav.history'),
+    _NavItem(Icons.medication_rounded, Icons.medication_outlined, 'nav.rx'),
+    _NavItem(Icons.description_rounded, Icons.description_outlined, 'nav.reports'),
+    _NavItem(Icons.person_rounded, Icons.person_outline_rounded, 'nav.profile'),
   ];
 
   void _go(int index) {
@@ -85,6 +86,7 @@ class _NavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final label = context.tr(item.label);
 
     Widget icon = Icon(selected ? item.active : item.inactive,
         size: 25, color: selected ? c.primary : c.text3);
@@ -98,7 +100,7 @@ class _NavButton extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: item.label,
+      label: label,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
@@ -108,7 +110,7 @@ class _NavButton extends StatelessWidget {
             icon,
             const SizedBox(height: 4),
             Text(
-              item.label,
+              label,
               style: AppText.small.copyWith(
                 color: selected ? c.primary : c.text3,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w600,

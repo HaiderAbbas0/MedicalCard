@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api } from '../api/client';
+import { supabase, emailFor } from '../api/supabase';
 
 /** Doctor self-registration (P-FR-002). Account is created PENDING. */
 export default function DoctorRegisterPage() {
@@ -24,18 +24,27 @@ export default function DoctorRegisterPage() {
     }
     setBusy(true);
     try {
-      const res = await api.post<{ message: string }>('/auth/register/doctor', {
-        cnic: form.cnic.trim(),
-        full_name: form.full_name.trim(),
+      const { error } = await supabase.auth.signUp({
+        email: emailFor(form.cnic.trim()),
         password: form.password,
-        pmdc_number: form.pmdc_number.trim(),
-        specialization_primary: form.specialization_primary.trim(),
-        phone_primary: form.phone_primary.trim() || undefined,
-        email: form.email.trim() || undefined,
-        qualification_mbbs: form.qualification_mbbs,
-        qualification_fcps: form.qualification_fcps,
+        options: {
+          data: {
+            role: 'doctor',
+            cnic: form.cnic.trim(),
+            full_name: form.full_name.trim(),
+            phone: form.phone_primary.trim(),
+            email: form.email.trim() || undefined,
+            pmdc_number: form.pmdc_number.trim(),
+            specialization_primary: form.specialization_primary.trim(),
+            qualification_mbbs: form.qualification_mbbs,
+            qualification_fcps: form.qualification_fcps,
+          },
+        },
       });
-      setDone(res.message);
+      if (error) throw new Error(error.message);
+      // Doctors start PENDING — sign out so they can't use the app until approved.
+      await supabase.auth.signOut();
+      setDone('Application submitted. An administrator will review your account before you can log in.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Registration failed.');
     } finally {

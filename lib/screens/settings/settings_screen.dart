@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/auth_controller.dart';
+import '../../i18n/app_strings.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../theme/app_colors.dart';
@@ -12,12 +13,6 @@ import '../../widgets/common/press_scale.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
-
-  void _snack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
 
   void _showLogoutSheet(BuildContext context) {
     final c = context.c;
@@ -127,14 +122,14 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text('Settings',
+                Text(context.tr('settings.title'),
                     style:
                         AppText.display.copyWith(fontSize: 22, color: c.text)),
               ],
             ),
             const SizedBox(height: 24),
             // ── Preferences ──────────────────────────────────────────────
-            const _SectionLabel('PREFERENCES'),
+            _SectionLabel(context.tr('settings.preferences')),
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
@@ -154,7 +149,7 @@ class SettingsScreen extends StatelessWidget {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Text('Language',
+                            child: Text(context.tr('settings.language'),
                                 style: AppText.body.copyWith(
                                     fontWeight: FontWeight.w600, color: c.text)),
                           ),
@@ -174,7 +169,7 @@ class SettingsScreen extends StatelessWidget {
                     child: Row(
                       children: [
                         Expanded(
-                          child: Text('Appearance',
+                          child: Text(context.tr('settings.appearance'),
                               style: AppText.body.copyWith(
                                   fontWeight: FontWeight.w600, color: c.text)),
                         ),
@@ -191,7 +186,7 @@ class SettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             // ── Security & Privacy ───────────────────────────────────────
-            const _SectionLabel('SECURITY & PRIVACY'),
+            _SectionLabel(context.tr('settings.security_privacy')),
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
@@ -203,23 +198,23 @@ class SettingsScreen extends StatelessWidget {
               child: Column(
                 children: [
                   _NavRow(
-                    label: 'Change password',
-                    onTap: () => _snack(context, 'Coming soon'),
+                    label: context.tr('settings.change_password'),
+                    onTap: () => context.push('/settings/change-password'),
                   ),
                   Divider(height: 1, color: c.border2),
                   _NavRow(
-                    label: 'Login & security',
-                    onTap: () => _snack(context, 'Coming soon'),
+                    label: context.tr('settings.login_security'),
+                    onTap: () => context.push('/settings/login-security'),
                   ),
                   Divider(height: 1, color: c.border2),
                   _NavRow(
-                    label: 'Consent management',
-                    onTap: () => _snack(context, 'Coming soon'),
+                    label: context.tr('settings.consent'),
+                    onTap: () => context.push('/settings/consent'),
                   ),
                   Divider(height: 1, color: c.border2),
                   _NavRow(
-                    label: 'Help & support',
-                    onTap: () => _snack(context, 'Coming soon'),
+                    label: context.tr('settings.help'),
+                    onTap: () => context.push('/settings/help'),
                   ),
                 ],
               ),
@@ -237,7 +232,7 @@ class SettingsScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(15),
                   border: Border.all(color: c.danger, width: 1.5),
                 ),
-                child: Text('Log out',
+                child: Text(context.tr('settings.logout'),
                     style: AppText.bodyLarge.copyWith(
                         fontWeight: FontWeight.w800, color: c.danger)),
               ),

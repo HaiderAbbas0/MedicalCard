@@ -1,259 +1,121 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import '../models/record_models.dart';
-import 'api_config.dart';
-import 'auth_service.dart';
+import 'supabase_client.dart';
 
+/// Patient medical records, read from Supabase and mapped to the UI models.
 class RecordService {
-  static const String _baseUrl = ApiConfig.baseUrl;
+  RecordService([String? _]); // token ignored — Supabase client is authenticated
 
-  final http.Client _client;
+  String _str(dynamic v) => v?.toString() ?? '';
 
-  RecordService({http.Client? client}) : _client = client ?? http.Client();
+  /// Build an id→value map for a column on a table (e.g. profiles.full_name).
+  Future<Map<String, dynamic>> _lookup(String table, List<String> ids, String col) async {
+    final unique = ids.where((e) => e.isNotEmpty).toSet().toList();
+    if (unique.isEmpty) return {};
+    final rows = await db.from(table).select('id, $col').inFilter('id', unique);
+    return {for (final r in rows as List) r['id'].toString(): r[col]};
+  }
 
-  /// Fetches medical visits/history.
   Future<List<VisitModel>> fetchVisits(String token) async {
-    final url = Uri.parse('$_baseUrl/patient/visits');
-    try {
-      final response = await _client.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+    final uid = currentUid;
+    if (uid == null) return [];
+    final rows = await db
+        .from('encounters')
+        .select('*, conditions(*), medication_requests(*)')
+        .eq('patient_id', uid)
+        .eq('status', 'finalized')
+        .order('encounter_date', ascending: false) as List;
+
+    final doctorIds = rows.map((e) => _str(e['doctor_id'])).toList();
+    final clinicIds = rows.map((e) => _str(e['clinic_id'])).toList();
+    final docNames = await _lookup('profiles', doctorIds, 'full_name');
+    final docSpec = await _lookup('doctor_profiles', doctorIds, 'specialization_primary');
+    final clinicNames = await _lookup('clinics', clinicIds, 'name');
+
+    return rows.map((e) {
+      final conds = (e['conditions'] as List? ?? []);
+      final meds = (e['medication_requests'] as List? ?? []);
+      final dx = conds.isNotEmpty ? _str(conds.first['condition_display']) : _str(e['assessment']);
+      // Specialty: explicit encounter specialty, else the doctor's primary.
+      var specialty = _str(e['specialty']);
+      if (specialty.isEmpty) specialty = _str(docSpec[_str(e['doctor_id'])]);
+      if (specialty.isEmpty) specialty = 'General Medicine';
+      return VisitModel(
+        id: _str(e['id']),
+        dx: dx.isEmpty ? 'Consultation' : dx,
+        doctor: _str(docNames[_str(e['doctor_id'])]),
+        specialty: specialty,
+        hospital: _str(clinicNames[_str(e['clinic_id'])]),
+        dateLabel: _str(e['encounter_date']),
+        time: '',
+        symptoms: _str(e['chief_complaint']),
+        diagnosis: conds
+            .map((c) => '${_str(c['condition_display'])}${c['icd10_code'] != null ? ' (${c['icd10_code']})' : ''}')
+            .join(', '),
+        diagnosisNote: _str(e['assessment']),
+        meds: meds.map<MedModel>((m) {
+          final strength = '${m['dosage_value'] ?? ''} ${m['dosage_unit'] ?? ''}'.trim();
+          return MedModel(
+            name: _str(m['medication_name']),
+            strength: strength,
+            freq: _str(m['frequency']).replaceAll('_', ' '),
+            dur: m['duration_days'] != null ? '${m['duration_days']} days' : 'Ongoing',
+          );
+        }).toList(),
+        followUp: _str(e['follow_up_date']),
+        advice: _str(e['plan']),
       );
-      if (response.statusCode == 200) {
-        final List<dynamic> body = jsonDecode(response.body) as List;
-        return body.map((v) => VisitModel.fromJson(v as Map<String, dynamic>)).toList();
-      } else {
-        throw ApiException('Failed to load visits', statusCode: response.statusCode);
-      }
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      debugPrint('RecordService: Fetch visits failed. Falling back to mock data.');
-      await Future.delayed(const Duration(milliseconds: 600));
-      
-      // Dynamic fallback mapping using mockVisits data representation
-      return [
-        VisitModel(
-          id: 'v1',
-          dx: 'Hypertension review',
-          doctor: 'Dr. Imran Yousuf',
-          specialty: 'Cardiology',
-          hospital: 'Shifa International Hospital',
-          dateLabel: '18 Jun 2026',
-          time: '09:30',
-          symptoms: 'Occasional headaches, mild dizziness in mornings. BP 148/94 on arrival.',
-          diagnosis: 'Essential hypertension (I10)',
-          diagnosisNote: 'Well-controlled on current regimen. Continue monitoring.',
-          meds: [
-            MedModel(name: 'Amlodipine', strength: '5 mg', freq: 'Once daily', dur: '30 days'),
-            MedModel(name: 'Metformin', strength: '500 mg', freq: 'Twice daily', dur: 'Ongoing'),
-            MedModel(name: 'Aspirin', strength: '75 mg', freq: 'Once daily', dur: '30 days'),
-          ],
-          followUp: '24 Jun 2026',
-          advice: 'Reduce salt intake, 30-min daily walk.',
-        ),
-        VisitModel(
-          id: 'v2',
-          dx: 'Diabetes follow-up',
-          doctor: 'Dr. Sana Tariq',
-          specialty: 'Endocrinology',
-          hospital: 'Aga Khan University Hospital',
-          dateLabel: '02 May 2026',
-          time: '11:15',
-          symptoms: 'Fasting sugar trending high last week. No acute complaints.',
-          diagnosis: 'Type 2 diabetes mellitus (E11)',
-          diagnosisNote: 'HbA1c improving. Maintain diet and metformin.',
-          meds: [
-            MedModel(name: 'Metformin', strength: '500 mg', freq: 'Twice daily', dur: 'Ongoing'),
-            MedModel(name: 'Glimepiride', strength: '1 mg', freq: 'Once daily', dur: '30 days'),
-          ],
-          followUp: '02 Aug 2026',
-          advice: 'Low-carb diet, monitor sugar twice daily.',
-        ),
-        VisitModel(
-          id: 'v3',
-          dx: 'Chest pain — cleared',
-          doctor: 'Dr. Imran Yousuf',
-          specialty: 'Cardiology',
-          hospital: 'Shifa International Hospital',
-          dateLabel: '21 Mar 2026',
-          time: '16:40',
-          symptoms: 'Transient chest tightness on exertion. ECG normal.',
-          diagnosis: 'Non-cardiac chest pain (R07.9)',
-          diagnosisNote: 'Cardiac causes ruled out. Likely musculoskeletal.',
-          meds: [MedModel(name: 'Pantoprazole', strength: '40 mg', freq: 'Once daily', dur: '14 days')],
-          followUp: 'As needed',
-          advice: 'Return if pain recurs at rest.',
-        ),
-        VisitModel(
-          id: 'v4',
-          dx: 'Seasonal influenza',
-          doctor: 'Dr. Bilal Aziz',
-          specialty: 'General Medicine',
-          hospital: 'CMH Lahore',
-          dateLabel: '09 Feb 2026',
-          time: '10:05',
-          symptoms: 'Fever, body aches and dry cough for 3 days.',
-          diagnosis: 'Influenza, unspecified (J11)',
-          diagnosisNote: 'Symptomatic management. Rest and hydration.',
-          meds: [
-            MedModel(name: 'Paracetamol', strength: '500 mg', freq: 'As needed', dur: '5 days'),
-            MedModel(name: 'Cetirizine', strength: '10 mg', freq: 'Once at night', dur: '5 days'),
-          ],
-          followUp: 'If not improving in 5 days',
-          advice: 'Plenty of fluids and rest.',
-        ),
-        VisitModel(
-          id: 'v5',
-          dx: 'Eye check-up',
-          doctor: 'Dr. Aasim Rehman',
-          specialty: 'Ophthalmology',
-          hospital: 'Shifa International Hospital',
-          dateLabel: '15 Jan 2026',
-          time: '14:00',
-          symptoms: 'Blurry vision in left eye when reading.',
-          diagnosis: 'Presbyopia (H52.4)',
-          diagnosisNote: 'Prescribed reading glasses. Follow up in 1 year.',
-          meds: [MedModel(name: 'Lubricant Eye Drops', strength: '0.5%', freq: 'Four times daily', dur: '30 days')],
-          followUp: '15 Jan 2027',
-          advice: 'Limit screen time, use drops daily.',
-        ),
-        VisitModel(
-          id: 'v6',
-          dx: 'Dental cleaning & filling',
-          doctor: 'Dr. Nadia Malik',
-          specialty: 'Dental',
-          hospital: 'Aga Khan University Hospital',
-          dateLabel: '05 Dec 2025',
-          time: '10:30',
-          symptoms: 'Sensitivity to cold water on upper right molar.',
-          diagnosis: 'Dental caries (K02.9)',
-          diagnosisNote: 'Composite filling done on tooth 14. Excellent oral hygiene.',
-          meds: [MedModel(name: 'Amoxicillin', strength: '500 mg', freq: 'Three times daily', dur: '5 days')],
-          followUp: '05 Jun 2026',
-          advice: 'Brush twice daily, floss daily.',
-        ),
-        VisitModel(
-          id: 'v7',
-          dx: 'Knee pain evaluation',
-          doctor: 'Dr. Tariq Mahmood',
-          specialty: 'Orthopedics',
-          hospital: 'CMH Lahore',
-          dateLabel: '12 Nov 2025',
-          time: '12:15',
-          symptoms: 'Mild pain in right knee after walking long distances.',
-          diagnosis: 'Osteoarthritis of knee, unspecified (M17.9)',
-          diagnosisNote: 'Early stage OA. Recommended physical therapy.',
-          meds: [MedModel(name: 'Glucosamine', strength: '1500 mg', freq: 'Once daily', dur: 'Ongoing')],
-          followUp: '12 May 2026',
-          advice: 'Avoid high-impact activities, knee support sleeve.',
-        ),
-      ];
-    }
+    }).toList();
   }
 
-  /// Fetches active and past prescriptions.
   Future<List<PrescriptionModel>> fetchPrescriptions(String token) async {
-    final url = Uri.parse('$_baseUrl/patient/prescriptions');
-    try {
-      final response = await _client.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+    final uid = currentUid;
+    if (uid == null) return [];
+    final rows = await db
+        .from('medication_requests')
+        .select()
+        .eq('patient_id', uid)
+        .order('created_at', ascending: false) as List;
+    final docNames = await _lookup('profiles', rows.map((m) => _str(m['doctor_id'])).toList(), 'full_name');
+    return rows.map((m) {
+      return PrescriptionModel(
+        id: _str(m['id']),
+        name: _str(m['medication_name']),
+        strength: '${m['dosage_value'] ?? ''} ${m['dosage_unit'] ?? ''}'.trim(),
+        freq: _str(m['frequency']).replaceAll('_', ' '),
+        dur: m['duration_days'] != null ? '${m['duration_days']} days' : 'Ongoing',
+        by: _str(docNames[_str(m['doctor_id'])]),
+        date: _str(m['start_date']),
+        active: _str(m['status']) == 'active',
+        morning: m['dose_morning'] == true,
+        afternoon: m['dose_afternoon'] == true,
+        evening: m['dose_evening'] == true,
+        night: m['dose_night'] == true,
+        durationDays: m['duration_days'] as int?,
       );
-      if (response.statusCode == 200) {
-        final List<dynamic> body = jsonDecode(response.body) as List;
-        return body.map((p) => PrescriptionModel.fromJson(p as Map<String, dynamic>)).toList();
-      } else {
-        throw ApiException('Failed to load prescriptions', statusCode: response.statusCode);
-      }
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      debugPrint('RecordService: Fetch prescriptions failed. Falling back to mock data.');
-      await Future.delayed(const Duration(milliseconds: 600));
-
-      return [
-        PrescriptionModel(
-          id: 'rx1',
-          name: 'Amlodipine',
-          strength: '5 mg',
-          freq: 'Once daily',
-          dur: '30 days',
-          by: 'Dr. Imran Yousuf',
-          date: '18 Jun',
-          active: true,
-        ),
-        PrescriptionModel(
-          id: 'rx2',
-          name: 'Metformin',
-          strength: '500 mg',
-          freq: 'Twice daily',
-          dur: 'Ongoing',
-          by: 'Dr. Sana Tariq',
-          date: '02 May',
-          active: true,
-        ),
-        PrescriptionModel(
-          id: 'rx3',
-          name: 'Aspirin',
-          strength: '75 mg',
-          freq: 'Once daily',
-          dur: '30 days',
-          by: 'Dr. Imran Yousuf',
-          date: '18 Jun',
-          active: true,
-          warn: 'Avoid with Penicillin-class drugs',
-        ),
-        PrescriptionModel(
-          id: 'rx4',
-          name: 'Pantoprazole',
-          strength: '40 mg',
-          freq: 'Once daily',
-          dur: 'Completed',
-          by: 'Dr. Imran Yousuf',
-          date: '21 Mar',
-          active: false,
-        ),
-      ];
-    }
+    }).toList();
   }
 
-  /// Fetches lab reports.
   Future<List<ReportModel>> fetchReports(String token) async {
-    final url = Uri.parse('$_baseUrl/patient/reports');
-    try {
-      final response = await _client.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+    final uid = currentUid;
+    if (uid == null) return [];
+    final rows = await db
+        .from('lab_orders')
+        .select('*, encounters(specialty)')
+        .eq('patient_id', uid)
+        .order('ordered_at', ascending: false) as List;
+    final labNames = await _lookup('diagnostic_labs', rows.map((o) => _str(o['lab_id'])).toList(), 'name');
+    return rows.map((o) {
+      final status = _str(o['status']);
+      var spec = _str((o['encounters'] as Map?)?['specialty']);
+      if (spec.isEmpty) spec = 'Laboratory';
+      return ReportModel(
+        id: _str(o['id']),
+        name: _str(o['test_name']),
+        lab: _str(labNames[_str(o['lab_id'])]),
+        date: _str(o['ordered_at']).split('T').first,
+        status: status == 'released_to_patient' ? 'ready' : status,
+        specialty: spec,
       );
-      if (response.statusCode == 200) {
-        final List<dynamic> body = jsonDecode(response.body) as List;
-        return body.map((r) => ReportModel.fromJson(r as Map<String, dynamic>)).toList();
-      } else {
-        throw ApiException('Failed to load reports', statusCode: response.statusCode);
-      }
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      debugPrint('RecordService: Fetch reports failed. Falling back to mock data.');
-      await Future.delayed(const Duration(milliseconds: 600));
-
-      return [
-        ReportModel(id: 'r1', name: 'Lipid Profile', lab: 'Shifa Lab', date: '18 Jun 2026', status: 'ready'),
-        ReportModel(id: 'r2', name: 'HbA1c', lab: 'Shifa Lab', date: '18 Jun 2026', status: 'ready'),
-        ReportModel(id: 'r3', name: 'Chest X-Ray', lab: 'Aga Khan', date: '02 May 2026', status: 'reviewed'),
-        ReportModel(id: 'r4', name: 'Fasting Blood Sugar', lab: 'Chughtai Lab', date: '02 May 2026', status: 'abnormal'),
-      ];
-    }
+    }).toList();
   }
 }

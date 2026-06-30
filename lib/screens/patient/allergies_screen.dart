@@ -6,7 +6,8 @@ import '../../services/patient_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/brand_app_bar.dart';
 
-/// Patient views their recorded allergy list (P-FR-017).
+/// Patient views their recorded allergy list (P-FR-017): active vs past,
+/// with severity, reaction, trigger and notes.
 class AllergiesScreen extends StatefulWidget {
   const AllergiesScreen({super.key});
 
@@ -25,9 +26,16 @@ class _AllergiesScreenState extends State<AllergiesScreen> {
     _future = _service.myAllergies();
   }
 
-  Color _critColor(BuildContext context, String? crit) {
+  Color _sevColor(BuildContext context, String? sev) {
     final c = context.c;
-    return crit == 'high' ? c.danger : (crit == 'low' ? c.safe : c.warn);
+    switch (sev) {
+      case 'severe':
+        return c.danger;
+      case 'mild':
+        return c.safe;
+      default:
+        return c.warn;
+    }
   }
 
   @override
@@ -45,8 +53,8 @@ class _AllergiesScreenState extends State<AllergiesScreen> {
           if (snap.hasError) {
             return Center(child: Text('${snap.error}', style: TextStyle(color: c.danger)));
           }
-          final allergies = snap.data ?? [];
-          if (allergies.isEmpty) {
+          final all = snap.data ?? [];
+          if (all.isEmpty) {
             return Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Icon(Icons.check_circle_outline, size: 48, color: c.safe),
@@ -55,43 +63,80 @@ class _AllergiesScreenState extends State<AllergiesScreen> {
               ]),
             );
           }
-          return ListView.separated(
+          final active = all.where((a) => (a['clinical_status'] ?? 'active') == 'active').toList();
+          final past = all.where((a) => (a['clinical_status'] ?? 'active') != 'active').toList();
+          return ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            itemCount: allergies.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (_, i) {
-              final a = allergies[i];
-              final crit = a['criticality']?.toString();
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: c.border),
-                ),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Icon(Icons.warning_amber_rounded, color: _critColor(context, crit)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(a['substance_name']?.toString() ?? '—', style: TextStyle(color: c.text, fontWeight: FontWeight.w700, fontSize: 16)),
-                      if (a['reaction_description'] != null) ...[
-                        const SizedBox(height: 4),
-                        Text(a['reaction_description'].toString(), style: TextStyle(color: c.text2)),
-                      ],
-                      const SizedBox(height: 6),
-                      Wrap(spacing: 8, children: [
-                        _tag(context, (a['category'] ?? 'medication').toString()),
-                        if (crit != null) _tag(context, '$crit criticality', color: _critColor(context, crit)),
-                      ]),
-                    ]),
-                  ),
-                ]),
-              );
-            },
+            children: [
+              if (active.isNotEmpty) ...[
+                _header(context, 'Active', active.length, c.danger),
+                for (final a in active) _card(context, a),
+              ],
+              if (past.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _header(context, 'Past / Resolved', past.length, c.text3),
+                for (final a in past) _card(context, a, dimmed: true),
+              ],
+            ],
           );
         },
       ),
+    );
+  }
+
+  Widget _header(BuildContext context, String title, int count, Color accent) {
+    final c = context.c;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 4, 2, 10),
+      child: Row(children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
+        const SizedBox(width: 8),
+        Text(title, style: TextStyle(color: c.text, fontWeight: FontWeight.w800, fontSize: 15)),
+        const SizedBox(width: 8),
+        Text('$count', style: TextStyle(color: c.text3, fontWeight: FontWeight.w700)),
+      ]),
+    );
+  }
+
+  Widget _card(BuildContext context, Map<String, dynamic> a, {bool dimmed = false}) {
+    final c = context.c;
+    final sev = a['severity']?.toString();
+    final crit = a['criticality']?.toString();
+    final reaction = a['reaction_description']?.toString();
+    final trigger = a['trigger_note']?.toString();
+    final accent = dimmed ? c.text3 : _sevColor(context, sev);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: c.border),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(dimmed ? Icons.history_rounded : Icons.warning_amber_rounded, color: accent),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(a['substance_name']?.toString() ?? '—',
+                style: TextStyle(color: c.text, fontWeight: FontWeight.w700, fontSize: 16)),
+            if (reaction != null && reaction.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text('Reaction: $reaction', style: TextStyle(color: c.text2)),
+            ],
+            if (trigger != null && trigger.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text('Trigger: $trigger', style: TextStyle(color: c.text2, fontSize: 13)),
+            ],
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 6, children: [
+              if (sev != null) _tag(context, '$sev severity', color: _sevColor(context, sev)),
+              if (crit != null) _tag(context, '$crit criticality', color: crit == 'high' ? c.danger : c.text3),
+              _tag(context, (a['category'] ?? 'medication').toString()),
+            ]),
+          ]),
+        ),
+      ]),
     );
   }
 

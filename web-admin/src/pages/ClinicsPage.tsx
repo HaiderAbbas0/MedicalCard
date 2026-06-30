@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { api } from '../api/client';
+import { adminApi } from '../api/admin';
 import type { Clinic } from '../api/types';
 import { Spinner, Empty, Modal } from '../components/ui';
 
@@ -14,7 +14,7 @@ export default function ClinicsPage() {
 
   function load() {
     setClinics(null);
-    api.get<Clinic[]>('/admin/clinics').then(setClinics).catch((e) => setError(e.message));
+    adminApi.clinics().then(setClinics).catch((e) => setError(e.message));
   }
   useEffect(load, []);
 
@@ -23,7 +23,7 @@ export default function ClinicsPage() {
     if (!form.name.trim()) return;
     setBusy(true);
     try {
-      await api.post('/admin/clinics', form);
+      await adminApi.createClinic(form);
       setShowCreate(false);
       setForm({ name: '', type: 'clinic', phone: '', address_city: '', address_province: '' });
       load();

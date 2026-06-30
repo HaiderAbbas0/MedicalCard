@@ -1,23 +1,61 @@
 import '../models/clinical_models.dart';
-import 'api_client.dart';
+import 'supabase_client.dart';
 
-/// Receptionist-facing API calls (Scope §11.5).
+/// Receptionist data backed by Supabase (Scope §11.5). Demographic + scheduling
+/// only — no clinical records.
 class ReceptionistService {
-  final ApiClient _api;
-  ReceptionistService(String token) : _api = ApiClient(token);
+  ReceptionistService([String? _]);
+
+  String get _me => currentUid ?? '';
+
+  Future<String?> _myClinic() async {
+    final r = await db.from('receptionist_profiles').select('clinic_id').eq('id', _me).maybeSingle();
+    return r?['clinic_id']?.toString();
+  }
 
   Future<List<AppointmentModel>> clinicAppointments({String? date}) async {
-    final res = await _api.get('/clinic/appointments${date != null ? '?date=$date' : ''}');
-    return (res as List).map((e) => AppointmentModel.fromJson(e)).toList();
+    final clinic = await _myClinic();
+    if (clinic == null) return [];
+    var q = db
+        .from('appointments')
+        .select('*, patient:profiles!patient_id(id, full_name, cnic, phone_primary), doctor:profiles!doctor_id(full_name)')
+        .eq('clinic_id', clinic);
+    if (date != null) q = q.eq('appointment_date', date);
+    final rows = await q as List;
+    return rows.map((r) {
+      final m = Map<String, dynamic>.from(r);
+      m['patient'] = r['patient'];
+      m['doctor_name'] = (r['doctor'] as Map?)?['full_name'];
+      return AppointmentModel.fromJson(m);
+    }).toList();
   }
 
   Future<List<Map<String, dynamic>>> clinicDoctors() async {
-    final res = await _api.get('/clinic/doctors');
-    return (res as List).cast<Map<String, dynamic>>();
+    final clinic = await _myClinic();
+    if (clinic == null) return [];
+    final rows = await db
+        .from('doctor_profiles')
+        .select('id, specialization_primary, profiles!id(full_name, status)')
+        .eq('clinic_id', clinic) as List;
+    return rows
+        .where((r) => (r['profiles'] as Map?)?['status'] == 'active')
+        .map((r) => {
+              'id': r['id'],
+              'full_name': (r['profiles'] as Map?)?['full_name'] ?? '',
+              'specialization_primary': r['specialization_primary'] ?? '',
+            })
+        .toList();
   }
 
   Future<Map<String, dynamic>> searchPatient(String cnic) async {
-    return await _api.get('/patients/search?cnic=$cnic') as Map<String, dynamic>;
+    final p = await db
+        .from('profiles')
+        .select('id, full_name, cnic, phone_primary')
+        .eq('cnic', cnic)
+        .eq('role', 'patient')
+        .maybeSingle();
+    if (p == null) throw Exception('No patient found with that CNIC.');
+    return Map<String, dynamic>.from(p);
   }
 
   Future<void> bookAppointment({
@@ -27,18 +65,31 @@ class ReceptionistService {
     required String time,
     String type = 'in_person',
     String? notes,
-  }) {
-    return _api.post('/appointments', {
+  }) async {
+    final clinic = await _myClinic();
+    await db.from('appointments').insert({
       'patient_id': patientId,
       'doctor_id': doctorId,
+      'clinic_id': clinic,
       'appointment_date': date,
       'appointment_time': time,
       'appointment_type': type,
+      'status': 'pending',
+      'booked_by_role': 'receptionist',
+      'booked_by_id': _me,
       if (notes != null) 'notes_for_doctor': notes,
     });
+    await db.from('notifications').insert([
+      {'recipient_id': doctorId, 'type': 'appointment_booked', 'title': 'New appointment request', 'body': 'A receptionist booked an appointment.'},
+      {'recipient_id': patientId, 'type': 'appointment_booked', 'title': 'Appointment booked', 'body': 'An appointment has been booked for you.'},
+    ]);
   }
 
-  Future<void> checkIn(String appointmentId) => _api.patch('/appointments/$appointmentId/check-in');
-  Future<void> cancel(String appointmentId, {String? reason}) =>
-      _api.patch('/appointments/$appointmentId/cancel', {if (reason != null) 'reason': reason});
+  Future<void> checkIn(String appointmentId) =>
+      db.from('appointments').update({'status': 'checked_in'}).eq('id', appointmentId);
+
+  Future<void> cancel(String appointmentId, {String? reason}) => db.from('appointments').update({
+        'status': 'cancelled_by_patient',
+        if (reason != null) 'cancellation_reason': reason,
+      }).eq('id', appointmentId);
 }

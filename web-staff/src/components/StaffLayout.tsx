@@ -1,23 +1,25 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import type { Role } from '../api/types';
+import Icon from './Icon';
 
 interface NavItem {
   to: string;
   label: string;
+  icon: string;
   end?: boolean;
 }
 
 const NAV_BY_ROLE: Record<string, NavItem[]> = {
   doctor: [
-    { to: '/doctor', label: "Today's Appointments", end: true },
-    { to: '/doctor/patients', label: 'Find Patient' },
-    { to: '/doctor/lab-results', label: 'Lab Results' },
-    { to: '/doctor/availability', label: 'Availability' },
-    { to: '/doctor/profile', label: 'My Profile' },
+    { to: '/doctor', label: "Today's Appointments", icon: 'calendar', end: true },
+    { to: '/doctor/patients', label: 'Find Patient', icon: 'users' },
+    { to: '/doctor/lab-results', label: 'Lab Results', icon: 'lab' },
+    { to: '/doctor/availability', label: 'Availability', icon: 'pending' },
+    { to: '/doctor/profile', label: 'My Profile', icon: 'doctor' },
   ],
-  lab_worker: [{ to: '/lab', label: 'Order Queue', end: true }],
-  receptionist: [{ to: '/reception', label: 'Clinic Schedule', end: true }],
+  lab_worker: [{ to: '/lab', label: 'Order Queue', icon: 'lab', end: true }],
+  receptionist: [{ to: '/reception', label: 'Clinic Schedule', icon: 'reception', end: true }],
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -42,7 +44,7 @@ export default function StaffLayout() {
         <nav>
           {nav.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => (isActive ? 'active' : '')}>
-              {n.label}
+              <span className="nav-row"><Icon name={n.icon} /> {n.label}</span>
             </NavLink>
           ))}
         </nav>

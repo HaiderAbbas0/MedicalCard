@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api, tokenStore, ApiError } from '../api/client';
-import type { AuthResponse, Profile } from '../api/types';
+import { supabase, emailFor, fetchFullProfile } from '../api/supabase';
+import type { Profile } from '../api/types';
 
 interface AuthState {
   user: Profile | null;
@@ -15,35 +15,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Restore the session on first load by refreshing the stored token.
   useEffect(() => {
-    const token = tokenStore.get();
-    if (!token) {
+    supabase.auth.getSession().then(async ({ data }) => {
+      const uid = data.session?.user.id;
+      if (uid) {
+        const profile = await fetchFullProfile(uid);
+        if (profile && profile.role === 'admin') setUser(profile as unknown as Profile);
+        else await supabase.auth.signOut();
+      }
       setLoading(false);
-      return;
-    }
-    api
-      .post<AuthResponse>('/auth/refresh', { token })
-      .then((res) => {
-        tokenStore.set(res.token);
-        setUser(res.user);
-      })
-      .catch(() => tokenStore.clear())
-      .finally(() => setLoading(false));
+    });
   }, []);
 
   async function login(identifier: string, password: string) {
-    const res = await api.post<AuthResponse>('/auth/login', { identifier, password });
-    if (res.user.role !== 'admin') {
-      throw new ApiError('This portal is for administrators only. Staff use the staff portal.', 403);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: emailFor(identifier),
+      password,
+    });
+    if (error) throw new Error(error.message.includes('Invalid') ? 'Invalid CNIC or password.' : error.message);
+
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    const profile = uid ? await fetchFullProfile(uid) : null;
+    if (!profile || profile.role !== 'admin') {
+      await supabase.auth.signOut();
+      throw new Error('This portal is for administrators only.');
     }
-    tokenStore.set(res.token);
-    setUser(res.user);
+    setUser(profile as unknown as Profile);
   }
 
   function logout() {
-    api.post('/auth/logout').catch(() => undefined);
-    tokenStore.clear();
+    supabase.auth.signOut();
     setUser(null);
   }
 

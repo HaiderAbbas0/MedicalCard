@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
+import { adminApi } from '../api/admin';
 import type { AuditEntry } from '../api/types';
 import { Spinner, Empty } from '../components/ui';
 
@@ -8,7 +8,7 @@ export default function AuditLogPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api.get<AuditEntry[]>('/admin/audit-logs?limit=200').then(setLogs).catch((e) => setError(e.message));
+    adminApi.auditLogs(200).then(setLogs).catch((e) => setError(e.message));
   }, []);
 
   if (error) return <div className="error-text">{error}</div>;

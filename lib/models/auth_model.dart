@@ -41,6 +41,7 @@ class UserModel {
   final String email;
   final String? phone;
   final String? cnic;
+  final String? cardNumber; // HAY-PAT-#### — the Unique ID
   final UserRole role;
   final String? status;
   final String? healthId;
@@ -57,6 +58,7 @@ class UserModel {
     required this.email,
     this.phone,
     this.cnic,
+    this.cardNumber,
     this.role = UserRole.patient,
     this.status,
     this.healthId,
@@ -76,6 +78,7 @@ class UserModel {
       email: (json['email'] ?? '') as String,
       phone: (json['phone_primary'] ?? json['phone']) as String?,
       cnic: json['cnic'] as String?,
+      cardNumber: json['card_number'] as String?,
       role: roleFromString(json['role'] as String?),
       status: json['status'] as String?,
       healthId: (json['healthId'] ?? ext['health_card_number']) as String?,
@@ -92,6 +95,7 @@ class UserModel {
         'email': email,
         'phone_primary': phone,
         'cnic': cnic,
+        'card_number': cardNumber,
         'role': roleToString(role),
         'status': status,
         'healthId': healthId,
