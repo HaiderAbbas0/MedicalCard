@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -7,6 +8,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/gradient_button.dart';
 import '../../widgets/common/press_scale.dart';
+import '../common/role_routing.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -41,7 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _pwCtrl.text,
     );
     if (success && mounted) {
-      context.go('/dashboard');
+      context.go(roleHome(authController.role));
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -65,23 +67,35 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 54,
-                height: 54,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: brandGradient(context),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: AppShadows.button,
-                ),
-                child: const _Cross(size: 26, color: Colors.white),
+              Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: c.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: c.border),
+                      boxShadow: AppShadows.card,
+                    ),
+                    child: SvgPicture.asset('assets/images/hayaat_logo.svg', width: 36, height: 36),
+                  ),
+                  const SizedBox(width: 12),
+                  Text.rich(
+                    TextSpan(children: [
+                      TextSpan(text: 'Hayaat', style: AppText.display.copyWith(color: c.text, fontSize: 24)),
+                      TextSpan(text: 'ID', style: AppText.display.copyWith(color: c.primary, fontSize: 24)),
+                    ]),
+                  ),
+                ],
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 24),
               Text('Welcome back',
                   style: AppText.display.copyWith(color: c.text, fontSize: 26)),
               const SizedBox(height: 6),
               Text(
-                'Sign in to your Sehat ID account',
+                'Sign in to your HayaatID account',
                 style: AppText.body.copyWith(color: c.text2),
               ),
               const SizedBox(height: 22),
@@ -90,14 +104,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 onChanged: (v) => setState(() => _isPatient = v),
               ),
               const SizedBox(height: 20),
-              _FieldLabel('Email or Phone'),
+              _FieldLabel('Unique ID'),
               const SizedBox(height: 8),
               _Field(
                 controller: _idCtrl,
-                icon: Icons.mail_outline_rounded,
-                hint: 'you@email.com  ·  03XX XXXXXXX',
+                icon: Icons.badge_outlined,
+                hint: 'e.g. HAY-PAT-0001',
                 hasError: idEmpty,
-                keyboardType: TextInputType.emailAddress,
                 onChanged: (_) {
                   if (_showError) setState(() => _showError = false);
                 },
@@ -127,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
               if (_showError) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Please enter your email/phone and password.',
+                  'Please enter your Unique ID and password.',
                   style: AppText.caption.copyWith(color: c.danger),
                 ),
               ],
@@ -148,7 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Consumer<AuthController>(
                 builder: (context, auth, child) {
                   return GradientButton(
-                    label: _isPatient ? 'Sign in as Patient' : 'Sign in as Doctor',
+                    label: _isPatient ? 'Sign in as Patient' : 'Sign in as Staff',
                     loading: auth.isLoading,
                     onPressed: _signIn,
                   );
@@ -157,8 +170,8 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 18),
               _InfoBanner(
                 text: _isPatient
-                    ? 'Sign in with the email or phone you registered with.'
-                    : 'Doctors are verified against the PMDC registry before access.',
+                    ? 'Sign in with your HayaatID Unique ID and password.'
+                    : 'Staff (doctor, lab worker, receptionist) sign in with their HayaatID Unique ID.',
               ),
               const SizedBox(height: 24),
               Center(
@@ -209,7 +222,6 @@ class _Field extends StatelessWidget {
   final bool obscure;
   final bool hasError;
   final Widget? trailing;
-  final TextInputType? keyboardType;
   final ValueChanged<String>? onChanged;
 
   const _Field({
@@ -219,7 +231,6 @@ class _Field extends StatelessWidget {
     this.obscure = false,
     this.hasError = false,
     this.trailing,
-    this.keyboardType,
     this.onChanged,
   });
 
@@ -245,7 +256,6 @@ class _Field extends StatelessWidget {
             child: TextField(
               controller: controller,
               obscureText: obscure,
-              keyboardType: keyboardType,
               onChanged: onChanged,
               style: AppText.body.copyWith(color: c.text),
               decoration: InputDecoration(
@@ -285,7 +295,7 @@ class _Segmented extends StatelessWidget {
       child: Row(
         children: [
           _segment(context, 'Patient', isPatient, () => onChanged(true)),
-          _segment(context, 'Doctor', !isPatient, () => onChanged(false)),
+          _segment(context, 'Staff', !isPatient, () => onChanged(false)),
         ],
       ),
     );
@@ -349,34 +359,3 @@ class _InfoBanner extends StatelessWidget {
   }
 }
 
-/// White / colored medical cross built from two rounded rectangles.
-class _Cross extends StatelessWidget {
-  final double size;
-  final Color color;
-  const _Cross({required this.size, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final bar = size * 0.30;
-    final radius = BorderRadius.circular(size * 0.12);
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: bar,
-            height: size,
-            decoration: BoxDecoration(color: color, borderRadius: radius),
-          ),
-          Container(
-            width: size,
-            height: bar,
-            decoration: BoxDecoration(color: color, borderRadius: radius),
-          ),
-        ],
-      ),
-    );
-  }
-}

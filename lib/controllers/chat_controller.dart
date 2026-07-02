@@ -8,11 +8,13 @@ class ChatController extends ChangeNotifier {
 
   List<Conversation> _conversations = [];
   bool _isLoading = false;
+  bool _loaded = false;
   String? _errorMessage;
 
   // Getters
   List<Conversation> get conversations => _conversations;
   bool get isLoading => _isLoading;
+  bool get loaded => _loaded;
   String? get errorMessage => _errorMessage;
 
   ChatController({ChatService? service}) : _service = service ?? ChatService();
@@ -29,6 +31,7 @@ class ChatController extends ChangeNotifier {
       _errorMessage = 'Failed to load conversations: $e';
     } finally {
       _isLoading = false;
+      _loaded = true;
       notifyListeners();
     }
   }
@@ -115,6 +118,7 @@ class ChatController extends ChangeNotifier {
   /// Clears stored chat history on logout.
   void clear() {
     _conversations = [];
+    _loaded = false;
     _errorMessage = null;
     notifyListeners();
   }

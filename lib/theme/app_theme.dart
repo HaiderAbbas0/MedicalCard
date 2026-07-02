@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 
-/// Light & dark [ThemeData] for SehatID.
+/// Light & dark [ThemeData] for HayaatID.
 class AppTheme {
   AppTheme._();
 
@@ -15,11 +16,7 @@ class AppTheme {
     final scheme = ColorScheme.fromSeed(
       seedColor: kPrimary,
       brightness: brightness,
-    ).copyWith(
-      primary: c.primary,
-      surface: c.surface,
-      error: c.danger,
-    );
+    ).copyWith(primary: c.primary, surface: c.surface, error: c.danger);
 
     return ThemeData(
       useMaterial3: true,
@@ -38,8 +35,9 @@ class AppTheme {
         centerTitle: false,
         iconTheme: IconThemeData(color: c.text),
         titleTextStyle: AppText.heading.copyWith(color: c.text),
-        systemOverlayStyle:
-            isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        systemOverlayStyle: isDark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
       ),
       dividerTheme: DividerThemeData(color: c.border, thickness: 1, space: 1),
       iconTheme: IconThemeData(color: c.text2),
@@ -55,14 +53,15 @@ class AppTheme {
         behavior: SnackBarBehavior.floating,
         backgroundColor: c.text,
         contentTextStyle: AppText.body.copyWith(color: c.surface),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: c.surfaceAlt,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         hintStyle: AppText.body.copyWith(color: c.text3),
         prefixIconColor: c.text3,
         border: OutlineInputBorder(

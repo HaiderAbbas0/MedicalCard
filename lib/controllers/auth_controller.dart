@@ -1,9 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth_model.dart';
 import '../services/auth_service.dart';
+import '../services/supabase_client.dart';
 
+/// Auth state backed by Supabase. The session is persisted automatically by
+/// supabase_flutter, so it survives app restarts.
 class AuthController extends ChangeNotifier {
   final AuthService _authService;
 
@@ -11,55 +12,40 @@ class AuthController extends ChangeNotifier {
   String? _token;
   bool _isLoading = false;
   String? _errorMessage;
-
   bool _bootstrapped = false;
 
-  // Getters
   UserModel? get currentUser => _currentUser;
   String? get token => _token;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  bool get isAuthenticated => _token != null && _currentUser != null;
+  bool get isAuthenticated => _currentUser != null;
   bool get bootstrapped => _bootstrapped;
   bool get loggedIn => isAuthenticated;
+  UserRole get role => _currentUser?.role ?? UserRole.patient;
 
-  AuthController({AuthService? authService}) 
-      : _authService = authService ?? AuthService();
+  AuthController({AuthService? authService}) : _authService = authService ?? AuthService();
 
-  /// Mock OTP check — only "123456" is accepted.
-  bool verifyOtp(String code) => code == '123456';
-
-  /// Complete login mock (used when transitioning from otp verification).
-  Future<void> completeLogin() async {
-    _setLoading(true);
-    // Mark as authenticated by storing a dummy session if none exists
-    if (!isAuthenticated) {
-      _token = 'mock_otp_token';
-      _currentUser = UserModel(
-        id: 'mock_id',
-        name: 'Ayesha Khan',
-        email: 'ayesha@example.com',
-      );
-      await _saveToken(_token!);
-      await _saveUser(_currentUser!);
-    }
-    _setLoading(false);
-  }
-
+  /// OTP check (signup creates the Supabase session; this step is a verification
+  /// gate). Demo code: 11111.
+  bool verifyOtp(String code) => code == '11111';
+  Future<void> completeLogin() async {} // session already created on signup
   Future<void> signOut() => logout();
 
-  /// Load session information when the app boots up.
+  /// Restore the session on boot from the persisted Supabase session.
   Future<void> loadSession() async {
     _isLoading = true;
     notifyListeners();
-
     try {
-      final savedToken = await _readToken();
-      final savedUser = await _readUser();
-
-      if (savedToken != null && savedUser != null) {
-        _token = savedToken;
-        _currentUser = savedUser;
+      final session = db.auth.currentSession;
+      final uid = db.auth.currentUser?.id;
+      if (session != null && uid != null) {
+        final profile = await fetchFullProfile(uid);
+        if (profile != null && profile['status'] == 'active') {
+          _token = session.accessToken;
+          _currentUser = UserModel.fromJson(profile);
+        } else {
+          await db.auth.signOut();
+        }
       }
     } catch (e) {
       _errorMessage = 'Failed to load session: $e';
@@ -70,21 +56,13 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  /// Perform login call and save authentication details.
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String identifier, String password) async {
     _setLoading(true);
     _clearError();
-
     try {
-      final authResponse = await _authService.login(email, password);
-      
-      _token = authResponse.token;
-      _currentUser = authResponse.user;
-
-      // Save token and user details in storage
-      await _saveToken(authResponse.token);
-      await _saveUser(authResponse.user);
-
+      final res = await _authService.login(identifier, password);
+      _token = res.token;
+      _currentUser = res.user;
       _setLoading(false);
       return true;
     } on ApiException catch (e) {
@@ -92,43 +70,39 @@ class AuthController extends ChangeNotifier {
       _setLoading(false);
       return false;
     } catch (e) {
-      _setError('An unexpected error occurred: ${e.toString()}');
+      _setError('An unexpected error occurred: $e');
       _setLoading(false);
       return false;
     }
   }
 
-  /// Perform sign up call and auto-login on success.
   Future<bool> signUp({
     required String name,
     required String email,
     required String password,
+    String? cnic,
     String? phone,
     String? dob,
     String? gender,
     String? bloodGroup,
+    String? emergencyPhone,
   }) async {
     _setLoading(true);
     _clearError();
-
     try {
-      final authResponse = await _authService.register(
+      final res = await _authService.register(
         name: name,
         email: email,
         password: password,
+        cnic: cnic,
         phone: phone,
         dob: dob,
         gender: gender,
         bloodGroup: bloodGroup,
+        emergencyPhone: emergencyPhone,
       );
-
-      _token = authResponse.token;
-      _currentUser = authResponse.user;
-
-      // Save credentials in storage
-      await _saveToken(authResponse.token);
-      await _saveUser(authResponse.user);
-
+      _token = res.token;
+      _currentUser = res.user;
       _setLoading(false);
       return true;
     } on ApiException catch (e) {
@@ -136,20 +110,22 @@ class AuthController extends ChangeNotifier {
       _setLoading(false);
       return false;
     } catch (e) {
-      _setError('An unexpected error occurred: ${e.toString()}');
+      _setError('An unexpected error occurred: $e');
       _setLoading(false);
       return false;
     }
   }
 
-  /// Log out the user and clear storage.
+  /// Update the cached user after a profile edit (DB already updated).
+  Future<void> updateCurrentUser(UserModel user) async {
+    _currentUser = user;
+    notifyListeners();
+  }
+
   Future<void> logout() async {
     _setLoading(true);
-    
     try {
-      await _deleteToken();
-      await _deleteUser();
-      
+      await _authService.signOut();
       _token = null;
       _currentUser = null;
       _clearError();
@@ -160,71 +136,18 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════
-  //  State Management Helpers
-  // ═══════════════════════════════════════════════════════════════════════
-
-  void _setLoading(bool value) {
-    _isLoading = value;
+  void _setLoading(bool v) {
+    _isLoading = v;
     notifyListeners();
   }
 
-  void _setError(String message) {
-    _errorMessage = message;
+  void _setError(String m) {
+    _errorMessage = m;
     notifyListeners();
   }
 
   void _clearError() {
     _errorMessage = null;
     notifyListeners();
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════
-  //  Secure Storage Placeholders
-  // ═══════════════════════════════════════════════════════════════════════
-  // These functions use SharedPreferences as a storage backend. If you want
-  // hardware-backed secure storage (iOS Keychain / Android Keystore), you can
-  // easily replace these with the 'flutter_secure_storage' package.
-  
-  static const String _tokenKey = 'auth_token';
-  static const String _userKey = 'user_data';
-
-  Future<void> _saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
-  }
-
-  Future<String?> _readToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
-  }
-
-  Future<void> _deleteToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenKey);
-  }
-
-  Future<void> _saveUser(UserModel user) async {
-    final prefs = await SharedPreferences.getInstance();
-    final userJson = user.toJson();
-    await prefs.setString(_userKey, jsonEncode(userJson));
-  }
-
-  Future<UserModel?> _readUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userString = prefs.getString(_userKey);
-    if (userString == null) return null;
-    
-    try {
-      final userMap = jsonDecode(userString) as Map<String, dynamic>;
-      return UserModel.fromJson(userMap);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _deleteUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_userKey);
   }
 }

@@ -53,29 +53,69 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 builder: (ctx) {
                   final records = context.watch<RecordController>();
                   final list = records.reports;
-                  return ListView(
-                    padding: const EdgeInsets.fromLTRB(22, 4, 22, 96),
-                    children: [
-                      if (list.isEmpty)
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 80),
+                  if (list.isEmpty) {
+                    return RefreshIndicator(
+                      onRefresh: () => context.read<RecordController>().refresh(),
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          const SizedBox(height: 80),
+                          Center(
                             child: Text(
                               'No lab reports found.',
                               style: AppText.body.copyWith(color: context.c.text3),
                             ),
                           ),
-                        )
-                      else
-                        for (final r in list) ...[
+                        ],
+                      ),
+                    );
+                  }
+                  // Group by specialty, non-empty groups only.
+                  final groups = <String, List<ReportModel>>{};
+                  for (final r in list) {
+                    final key = r.specialty.trim().isEmpty ? 'Laboratory' : r.specialty.trim();
+                    groups.putIfAbsent(key, () => []).add(r);
+                  }
+                  final keys = groups.keys.toList()..sort();
+                  return RefreshIndicator(
+                    onRefresh: () => context.read<RecordController>().refresh(),
+                    child: ListView(
+                    padding: const EdgeInsets.fromLTRB(22, 4, 22, 96),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      for (final k in keys) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
+                          child: Row(
+                            children: [
+                              Text(k,
+                                  style: AppText.bodyStrong.copyWith(
+                                      fontSize: 14, fontWeight: FontWeight.w800, color: context.c.text)),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: context.c.bg,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(color: context.c.border),
+                                ),
+                                child: Text('${groups[k]!.length}',
+                                    style: AppText.small.copyWith(
+                                        fontSize: 11, fontWeight: FontWeight.w700, color: context.c.text3)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        for (final r in groups[k]!) ...[
                           _ReportCard(
                             report: r,
-                            onDownload: () =>
-                                _snack(context, 'Downloading ${r.name}…'),
+                            onDownload: () => _snack(context, 'Downloading ${r.name}…'),
                           ),
                           const SizedBox(height: 12),
                         ],
+                      ],
                     ],
+                  ),
                   );
                 },
               ),

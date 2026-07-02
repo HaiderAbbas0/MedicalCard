@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'package:flutter_svg/flutter_svg.dart';
+
 import '../../controllers/auth_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../common/role_routing.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -54,7 +57,7 @@ class _SplashScreenState extends State<SplashScreen>
     }
     if (!mounted) return;
     if (auth.loggedIn) {
-      context.go('/dashboard');
+      context.go(roleHome(auth.role));
     } else {
       context.go('/onboarding');
     }
@@ -89,8 +92,11 @@ class _SplashScreenState extends State<SplashScreen>
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(30),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 10)),
+                          ],
                         ),
-                        child: const _MedicalCross(size: 52, color: kPrimary),
+                        child: SvgPicture.asset('assets/images/hayaat_logo.svg', width: 62, height: 62),
                       ),
                     ),
                     const SizedBox(height: 26),
@@ -101,7 +107,7 @@ class _SplashScreenState extends State<SplashScreen>
                         child: Column(
                           children: [
                             Text(
-                              'Sehat ID',
+                              'HayaatID',
                               style: AppText.display.copyWith(
                                 color: Colors.white,
                                 fontSize: 30,
@@ -163,34 +169,3 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-/// Green medical cross built from two rounded rectangles.
-class _MedicalCross extends StatelessWidget {
-  final double size;
-  final Color color;
-  const _MedicalCross({required this.size, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final bar = size * 0.30;
-    final radius = BorderRadius.circular(size * 0.12);
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: bar,
-            height: size,
-            decoration: BoxDecoration(color: color, borderRadius: radius),
-          ),
-          Container(
-            width: size,
-            height: bar,
-            decoration: BoxDecoration(color: color, borderRadius: radius),
-          ),
-        ],
-      ),
-    );
-  }
-}

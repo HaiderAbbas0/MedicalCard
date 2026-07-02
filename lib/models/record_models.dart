@@ -112,6 +112,12 @@ class PrescriptionModel {
   final String date;
   final bool active;
   final String? warn;
+  // Dosing schedule (for reminders).
+  final bool morning;
+  final bool afternoon;
+  final bool evening;
+  final bool night;
+  final int? durationDays;
 
   PrescriptionModel({
     required this.id,
@@ -123,7 +129,20 @@ class PrescriptionModel {
     required this.date,
     required this.active,
     this.warn,
+    this.morning = false,
+    this.afternoon = false,
+    this.evening = false,
+    this.night = false,
+    this.durationDays,
   });
+
+  /// Dose labels enabled for this medication, in order.
+  List<String> get doseLabels => [
+        if (morning) 'morning',
+        if (afternoon) 'afternoon',
+        if (evening) 'evening',
+        if (night) 'night',
+      ];
 
   factory PrescriptionModel.fromJson(Map<String, dynamic> json) {
     return PrescriptionModel(
@@ -160,6 +179,7 @@ class ReportModel {
   final String lab;
   final String date;
   final String status; // 'ready', 'reviewed', 'abnormal'
+  final String specialty;
 
   ReportModel({
     required this.id,
@@ -167,6 +187,7 @@ class ReportModel {
     required this.lab,
     required this.date,
     required this.status,
+    this.specialty = 'Laboratory',
   });
 
   factory ReportModel.fromJson(Map<String, dynamic> json) {

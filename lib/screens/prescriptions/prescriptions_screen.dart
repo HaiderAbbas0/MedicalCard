@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/record_controller.dart';
@@ -32,9 +33,35 @@ class _PrescriptionsScreenState extends State<PrescriptionsScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(22, 10, 22, 14),
-              child: Text('Prescriptions',
-                  style: AppText.display
-                      .copyWith(fontSize: 24, color: context.c.text)),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text('Prescriptions',
+                        style: AppText.display
+                            .copyWith(fontSize: 24, color: context.c.text)),
+                  ),
+                  PressScale(
+                    onTap: () => context.push('/reminders'),
+                    semanticLabel: 'Medicine reminders',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                      decoration: BoxDecoration(
+                        gradient: brandGradient(context),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                        Icon(Icons.alarm_rounded, size: 17, color: Colors.white),
+                        SizedBox(width: 6),
+                        Text('Reminders',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700)),
+                      ]),
+                    ),
+                  ),
+                ],
+              ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(22, 0, 22, 12),
@@ -64,14 +91,27 @@ class _PrescriptionsScreenState extends State<PrescriptionsScreen> {
             Expanded(
               child: FakeLoader(
                 skeleton: const ShimmerList(count: 4),
-                builder: (ctx) => ListView(
-                  padding: const EdgeInsets.fromLTRB(22, 4, 22, 96),
-                  children: [
-                    for (final rx in items) ...[
-                      _RxCard(rx: rx),
-                      const SizedBox(height: 12),
+                builder: (ctx) => RefreshIndicator(
+                  onRefresh: () => context.read<RecordController>().refresh(),
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(22, 4, 22, 96),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      if (items.isEmpty) ...[
+                        const SizedBox(height: 90),
+                        Center(
+                          child: Text(
+                            _active ? 'No active prescriptions.' : 'No past prescriptions.',
+                            style: AppText.body.copyWith(color: context.c.text3),
+                          ),
+                        ),
+                      ],
+                      for (final rx in items) ...[
+                        _RxCard(rx: rx),
+                        const SizedBox(height: 12),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),

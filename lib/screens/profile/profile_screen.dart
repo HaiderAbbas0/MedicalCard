@@ -1,9 +1,12 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/auth_controller.dart';
+import '../../controllers/card_controller.dart';
 import '../../data/mock_data.dart';
+import '../../services/card_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/gradient_button.dart';
@@ -12,11 +15,36 @@ import '../../widgets/common/press_scale.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+  Future<void> _changePhoto(BuildContext context) async {
+    final cardCtrl = context.read<CardController>();
+    if (cardCtrl.card == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Request your card first to add a photo.')),
+      );
+      return;
+    }
+    final res = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+    if (res == null || res.files.single.bytes == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final url = await CardService().uploadPhoto(res.files.single.bytes!);
+      await CardService().setPhotoUrl(url);
+      await cardCtrl.load(); // refresh card → keeps profile + card in sync
+      messenger.showSnackBar(const SnackBar(content: Text('Photo updated.')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Could not update photo: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final auth = context.watch<AuthController>();
+    final cardCtrl = context.watch<CardController>();
     final p = auth.currentUser?.toPatient() ?? mockPatient;
+    final photoUrl = cardCtrl.card?.photoUrl;
+    final uniqueId = auth.currentUser?.cardNumber ?? p.healthId;
+    final email = auth.currentUser?.email ?? '—';
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -50,30 +78,47 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 Column(
                   children: [
-                    Container(
-                      width: 84,
-                      height: 84,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            width: 3),
-                      ),
-                      child: Text(p.initials,
-                          style: AppText.display.copyWith(
-                              fontSize: 30, color: Colors.white)),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 88,
+                          height: 88,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 3),
+                            image: (photoUrl != null && photoUrl.isNotEmpty)
+                                ? DecorationImage(image: NetworkImage(photoUrl), fit: BoxFit.cover)
+                                : null,
+                          ),
+                          child: (photoUrl == null || photoUrl.isEmpty)
+                              ? Text(p.initials, style: AppText.display.copyWith(fontSize: 30, color: Colors.white))
+                              : null,
+                        ),
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: PressScale(
+                            onTap: () => _changePhoto(context),
+                            semanticLabel: 'Change photo',
+                            child: Container(
+                              width: 30,
+                              height: 30,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                              child: Icon(Icons.camera_alt_rounded, size: 16, color: c.primary),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
-                    Text(p.name,
-                        style: AppText.display
-                            .copyWith(fontSize: 22, color: Colors.white)),
+                    Text(p.name, style: AppText.display.copyWith(fontSize: 22, color: Colors.white)),
                     const SizedBox(height: 4),
-                    Text(p.healthId,
-                        style: AppText.mono.copyWith(
-                            fontSize: 13,
-                            color: Colors.white.withValues(alpha: 0.9))),
+                    Text(uniqueId,
+                        style: AppText.mono.copyWith(fontSize: 13, color: Colors.white.withValues(alpha: 0.9))),
                   ],
                 ),
               ],
@@ -93,16 +138,12 @@ class ProfileScreen extends StatelessWidget {
                   mainAxisSpacing: 11,
                   childAspectRatio: 2.1,
                   children: [
-                    _FactCard(
-                        label: 'BLOOD GROUP',
-                        value: p.blood,
-                        valueColor: c.danger),
-                    _FactCard(label: 'DATE OF BIRTH', value: p.dob),
+                    _FactCard(label: 'UNIQUE ID', value: uniqueId, valueSize: 14),
+                    _FactCard(label: 'BLOOD GROUP', value: p.blood, valueColor: c.danger),
+                    _FactCard(label: 'DATE OF BIRTH', value: p.dob, valueSize: 15),
                     _FactCard(label: 'GENDER', value: p.gender),
-                    _FactCard(
-                        label: 'PHONE',
-                        value: p.phoneMasked,
-                        valueSize: 15),
+                    _FactCard(label: 'PHONE', value: p.phoneMasked, valueSize: 15),
+                    _FactCard(label: 'EMAIL', value: email, valueSize: 13),
                   ],
                 ),
                 const SizedBox(height: 14),

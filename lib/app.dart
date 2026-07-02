@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'controllers/auth_controller.dart';
 import 'controllers/record_controller.dart';
+import 'controllers/card_controller.dart';
 import 'controllers/chat_controller.dart';
 import 'providers/language_provider.dart';
 import 'providers/theme_provider.dart';
@@ -18,7 +19,7 @@ class SehatIdApp extends StatelessWidget {
     final lang = context.watch<LanguageProvider>();
 
     return MaterialApp.router(
-      title: 'SehatID',
+      title: 'HayaatID',
       debugShowCheckedModeBanner: false,
       themeMode: theme.mode,
       theme: AppTheme.light(),
@@ -49,12 +50,27 @@ class AppProviders extends StatelessWidget {
           create: (_) => RecordController(),
           update: (_, auth, record) {
             final rec = record ?? RecordController();
+            // Defer so we never call notifyListeners() during the build phase.
             if (auth.isAuthenticated) {
-              rec.loadRecords(auth.token!);
+              if (!rec.loaded && !rec.isLoading) {
+                Future.microtask(() => rec.loadRecords(auth.token!));
+              }
             } else {
-              rec.clear();
+              Future.microtask(rec.clear);
             }
             return rec;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthController, CardController>(
+          create: (_) => CardController(),
+          update: (_, auth, card) {
+            final cc = card ?? CardController();
+            if (auth.isAuthenticated) {
+              if (!cc.loaded && !cc.loading) Future.microtask(cc.load);
+            } else {
+              Future.microtask(cc.clear);
+            }
+            return cc;
           },
         ),
         ChangeNotifierProxyProvider<AuthController, ChatController>(
@@ -62,9 +78,9 @@ class AppProviders extends StatelessWidget {
           update: (_, auth, chat) {
             final ch = chat ?? ChatController();
             if (auth.isAuthenticated) {
-              ch.loadConversations(auth.token!);
+              if (!ch.loaded) Future.microtask(() => ch.loadConversations(auth.token!));
             } else {
-              ch.clear();
+              Future.microtask(ch.clear);
             }
             return ch;
           },
