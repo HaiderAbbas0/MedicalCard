@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/auth_controller.dart';
+import '../../services/compliance_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/gradient_button.dart';
@@ -121,6 +122,13 @@ class _OtpScreenState extends State<OtpScreen> {
           setState(() => _busy = false);
           return;
         }
+
+        // The account exists now — record acceptance of the current Privacy
+        // Policy + Terms (given via the sign-up consent). Best-effort: a failure
+        // here must not block the user from reaching the app.
+        try {
+          await ComplianceService().recordSignupConsent();
+        } catch (_) {/* non-blocking */}
       } else {
         // Standalone OTP (e.g. a login step): just complete the existing session.
         await context.read<AuthController>().completeLogin();

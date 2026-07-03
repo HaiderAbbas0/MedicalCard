@@ -46,5 +46,18 @@ app.*.map.json
 
 # Local configuration and script files
 .env
+.env.local
+.env.*.local
 mobileClone.bat
 run_test.bat
+
+# Node dependencies (any package folder) — restore with `npm install`
+node_modules/
+
+# Web app build output & TS build cache
+web-admin/dist/
+web-staff/dist/
+*.tsbuildinfo
+# Compiled config emitted by `tsc -b` (Vite uses the .ts sources directly)
+web-admin/vite.config.js
+web-staff/vite.config.js

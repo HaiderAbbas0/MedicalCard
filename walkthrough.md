@@ -1,3 +1,8 @@
+> ⚠️ **HISTORICAL — describes the retired in-memory Node/Express prototype.**
+> The production architecture is now **Supabase-first** (see the root `README.md`
+> and `supabase/SUPABASE_SETUP.md`). The `/backend` folder this document refers to
+> has been removed. Kept only as a record of the earlier prototype.
+
 # Walkthrough — Backend Authentication & UI Data Integration
 
 We have resolved the placeholder login issues and fully bound the authenticated user session to the app's UI screens.

@@ -2,10 +2,19 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Central Supabase configuration + helpers for the HayaatID app.
 class SupabaseConfig {
-  static const String url = 'https://iikwdtiqvxxatrzahuzo.supabase.co';
+  /// Supabase project URL. Overridable at build time with
+  /// `--dart-define=SUPABASE_URL=...`; defaults to the shared dev/demo project.
+  static const String url = String.fromEnvironment(
+    'SUPABASE_URL',
+    defaultValue: 'https://iikwdtiqvxxatrzahuzo.supabase.co',
+  );
 
-  /// Publishable key (current Supabase client key; safe to ship — RLS protects data).
-  static const String publishableKey = 'sb_publishable_4axuKG5-YTuZeHuuzZjuVw_cB5_h-xn';
+  /// Publishable key (safe to ship — RLS protects data). Overridable with
+  /// `--dart-define=SUPABASE_PUBLISHABLE_KEY=...`. Production builds MUST set it.
+  static const String publishableKey = String.fromEnvironment(
+    'SUPABASE_PUBLISHABLE_KEY',
+    defaultValue: 'sb_publishable_4axuKG5-YTuZeHuuzZjuVw_cB5_h-xn',
+  );
 
   /// Legacy anon JWT (kept as a fallback for older tooling).
   static const String anonKey =

@@ -10,11 +10,14 @@ import PatientLookupPage from './pages/doctor/PatientLookupPage';
 import PatientRecordPage from './pages/doctor/PatientRecordPage';
 import NewEncounterPage from './pages/doctor/NewEncounterPage';
 import LabReviewPage from './pages/doctor/LabReviewPage';
+import MessagesPage from './pages/doctor/MessagesPage';
 import AvailabilityPage from './pages/doctor/AvailabilityPage';
 import DoctorProfilePage from './pages/doctor/DoctorProfilePage';
 // Lab + Reception
 import LabQueuePage from './pages/lab/LabQueuePage';
 import SchedulePage from './pages/reception/SchedulePage';
+import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
+import TermsPage from './pages/legal/TermsPage';
 
 function homeFor(role: string) {
   if (role === 'lab_worker') return '/lab';
@@ -30,6 +33,7 @@ function DoctorRoutes() {
       <Route path="/doctor/patient/:id" element={<PatientRecordPage />} />
       <Route path="/doctor/patient/:id/encounter" element={<NewEncounterPage />} />
       <Route path="/doctor/lab-results" element={<LabReviewPage />} />
+      <Route path="/doctor/messages" element={<MessagesPage />} />
       <Route path="/doctor/availability" element={<AvailabilityPage />} />
       <Route path="/doctor/profile" element={<DoctorProfilePage />} />
     </Route>
@@ -62,6 +66,8 @@ function Root() {
         element={loading ? <Spinner /> : user ? <Navigate to={homeFor(user.role)} replace /> : <LoginPage />}
       />
       <Route path="/register-doctor" element={<DoctorRegisterPage />} />
+      <Route path="/legal/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/legal/terms" element={<TermsPage />} />
       <Route path="/*" element={<ProtectedRoutes />} />
     </Routes>
   );

@@ -15,6 +15,8 @@ const STATUS_CLASS: Record<string, string> = {
   suspended: 'badge-red',
   rejected: 'badge-red',
   closed: 'badge-gray',
+  processing: 'badge-blue',
+  completed: 'badge-green',
 };
 
 export function StatusBadge({ status }: { status: AccountStatus | string }) {

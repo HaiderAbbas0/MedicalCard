@@ -27,6 +27,10 @@ class ChatMessage {
 }
 
 class Conversation {
+  /// Supabase `conversations.id` for this thread ('' for a not-yet-created one).
+  final String conversationId;
+
+  /// The counterpart's `profiles.id` (the doctor, from the patient's view).
   final String doctorId;
   final String initials;
   final String name;
@@ -37,6 +41,7 @@ class Conversation {
   final List<ChatMessage> messages;
 
   Conversation({
+    this.conversationId = '',
     required this.doctorId,
     required this.initials,
     required this.name,
@@ -53,6 +58,7 @@ class Conversation {
         .toList();
 
     return Conversation(
+      conversationId: (json['conversationId'] as String?) ?? '',
       doctorId: json['doctorId'] as String,
       initials: json['initials'] as String,
       name: json['name'] as String,
@@ -66,6 +72,7 @@ class Conversation {
 
   Map<String, dynamic> toJson() {
     return {
+      'conversationId': conversationId,
       'doctorId': doctorId,
       'initials': initials,
       'name': name,
@@ -78,6 +85,7 @@ class Conversation {
   }
 
   Conversation copyWith({
+    String? conversationId,
     String? doctorId,
     String? initials,
     String? name,
@@ -88,6 +96,7 @@ class Conversation {
     List<ChatMessage>? messages,
   }) {
     return Conversation(
+      conversationId: conversationId ?? this.conversationId,
       doctorId: doctorId ?? this.doctorId,
       initials: initials ?? this.initials,
       name: name ?? this.name,

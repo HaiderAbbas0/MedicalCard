@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Clinic, DashboardStats, DoctorApplication, Lab, Profile, AuditEntry } from './types';
+import type { Clinic, DashboardStats, DoctorApplication, Lab, Profile, AuditEntry, DeletionRequest, DeletionStatus, CardDelivery, CardStatus } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Q = any;
@@ -132,6 +132,79 @@ export const adminApi = {
       supabase.from('audit_logs').select('*, actor:profiles!actor_id(full_name)').order('timestamp', { ascending: false }).limit(limit),
     );
     return data.map((l) => ({ ...l, actor_name: l.actor?.full_name ?? 'System' })) as AuditEntry[];
+  },
+
+  /** Account deletion requests, joined to the requesting user's profile, newest first. */
+  async deletionRequests(): Promise<DeletionRequest[]> {
+    const data = await rows<Q>(
+      supabase
+        .from('deletion_requests')
+        .select('*, profiles!user_id(full_name, cnic)')
+        .order('requested_at', { ascending: false }),
+    );
+    return data.map((r) => ({
+      id: r.id,
+      user_id: r.user_id,
+      reason: r.reason,
+      status: r.status,
+      note: r.note,
+      requested_at: r.requested_at,
+      processed_at: r.processed_at,
+      processed_by: r.processed_by,
+      full_name: r.profiles?.full_name ?? null,
+      cnic: r.profiles?.cnic ?? null,
+    }));
+  },
+
+  /**
+   * Record an admin decision on a deletion request. Sets status, an optional note,
+   * and stamps processed_at/processed_by. NOTE: erasing the auth user + data is done
+   * by the delete-account Edge Function, not from the browser.
+   */
+  async updateDeletionRequest(id: string, status: DeletionStatus, note: string): Promise<void> {
+    const adminId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    const { error } = await supabase
+      .from('deletion_requests')
+      .update({
+        status,
+        note: note.trim() || null,
+        processed_at: new Date().toISOString(),
+        processed_by: adminId,
+      })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+
+  /** Cards awaiting delivery (or optionally already delivered), joined to the owner profile. */
+  async cardDeliveries(statuses: CardStatus[] = ['physical_requested']): Promise<CardDelivery[]> {
+    const data = await rows<Q>(
+      supabase
+        .from('cards')
+        .select('*, profiles!profile_id(full_name, cnic)')
+        .in('status', statuses)
+        .order('updated_at', { ascending: false }),
+    );
+    return data.map((c) => ({
+      id: c.id,
+      profile_id: c.profile_id,
+      card_number: c.card_number,
+      name_en: c.name_en,
+      status: c.status,
+      delivery_address: c.delivery_address,
+      delivery_phone: c.delivery_phone,
+      delivery_fee_pkr: c.delivery_fee_pkr,
+      updated_at: c.updated_at,
+      full_name: c.profiles?.full_name ?? null,
+      cnic: c.profiles?.cnic ?? null,
+    }));
+  },
+
+  async markCardDelivered(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('cards')
+      .update({ status: 'delivered', updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
   },
 
   /** Create a staff/admin account via the admin-create-user Edge Function. */

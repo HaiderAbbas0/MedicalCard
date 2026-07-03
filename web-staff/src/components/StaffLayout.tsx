@@ -15,6 +15,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { to: '/doctor', label: "Today's Appointments", icon: 'calendar', end: true },
     { to: '/doctor/patients', label: 'Find Patient', icon: 'users' },
     { to: '/doctor/lab-results', label: 'Lab Results', icon: 'lab' },
+    { to: '/doctor/messages', label: 'Messages', icon: 'chat' },
     { to: '/doctor/availability', label: 'Availability', icon: 'pending' },
     { to: '/doctor/profile', label: 'My Profile', icon: 'doctor' },
   ],

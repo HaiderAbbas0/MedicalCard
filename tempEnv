@@ -1,2 +1,0 @@
-#on cmd type ipconfig and get wifi ipv4 ip. Copy this file to '.env' and replace with your local PC's Wi-Fi IP address
-WIFI_IP=YOUR_WIFI_IP_HERE

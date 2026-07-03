@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { supabase, emailFor } from '../api/supabase';
 
+/** Password policy: at least 8 characters, with a letter and a number. */
+function passwordPolicyError(pw: string): string | null {
+  if (pw.length < 8) return 'Password must be at least 8 characters.';
+  if (!/[A-Za-z]/.test(pw) || !/\d/.test(pw)) return 'Password needs at least one letter and one number.';
+  return null;
+}
+
 /** Doctor self-registration (P-FR-002). Account is created PENDING. */
 export default function DoctorRegisterPage() {
   const [form, setForm] = useState({
@@ -22,6 +29,8 @@ export default function DoctorRegisterPage() {
     if (!form.full_name.trim() || !form.password || !form.pmdc_number.trim() || !form.specialization_primary.trim()) {
       return setError('Name, password, PMDC number, and specialization are required.');
     }
+    const pwErr = passwordPolicyError(form.password);
+    if (pwErr) return setError(pwErr);
     setBusy(true);
     try {
       const { error } = await supabase.auth.signUp({

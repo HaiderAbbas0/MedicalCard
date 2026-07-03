@@ -2,75 +2,104 @@
 
 A centralized digital health-card platform for Pakistan: every citizen's medical
 history is linked to their CNIC, accessible to any approved clinic, hospital, or
-lab with consent. This repository implements the **investor prototype** described
-in `docs/ibbi docs/CNIC_Health_Card_PROTOTYPE_Scope.pdf` (the production
-reference is `CNIC_Health_Card_System_Design.pdf`).
+lab with consent. This repository implements the system described in
+`docs/ibbi docs/CNIC_Health_Card_System_Design.pdf` (prototype scope:
+`CNIC_Health_Card_PROTOTYPE_Scope.pdf`).
 
-## The three parts (kept cleanly separated)
+## Architecture: Supabase-first (single production backend)
+
+**Supabase is the one production backend.** All three client apps talk to it
+directly — there is no separate application API server in production.
+
+```
+                         ┌──────────────────────────────────────┐
+                         │              Supabase                 │
+   Flutter (lib/) ─────► │  Auth · Postgres (RLS) · Storage ·    │
+   web-admin/     ─────► │  Edge Functions (service-role only)   │
+   web-staff/     ─────► │                                       │
+                         └──────────────────────────────────────┘
+```
+
+| Layer | Responsibility |
+| ----- | -------------- |
+| **Supabase Auth** | Identity, sessions, JWTs. Login via CNIC/phone/card-number → `<id>@hayaat.id`. |
+| **Supabase Postgres** | All data. 21 tables, **Row Level Security on every table**, `SECURITY DEFINER` role helpers, triggers. See `supabase/`. |
+| **Supabase Storage** | `lab-results` (private, signed-URL access) and `card-photos` buckets. |
+| **Supabase Edge Functions** | Privileged, server-only operations that must use the service-role key (e.g. `admin-create-user`). Never done from the client. |
+
+> **The `backend/` folder (Node/Express) is demo-only and NOT part of the
+> production architecture.** It is a legacy in-memory prototype kept solely so the
+> mobile chat screen has something to call until messaging is migrated to Supabase
+> Realtime. Do not build new features against it. See `backend/README.md`.
+
+## The clients
 
 | Folder        | Stack                     | Serves                                   |
 | ------------- | ------------------------- | ---------------------------------------- |
-| `backend/`    | Node.js + Express         | Shared REST API for every role + both web apps |
 | `lib/`        | Flutter (Android + iOS)   | **Mobile** — patient · doctor · lab worker · receptionist |
-| `web-admin/`  | React 18 + TypeScript (Vite) | **Admin web app** — administrators only |
-| `web-staff/`  | React 18 + TypeScript (Vite) | **Staff web app** — doctor · lab worker · receptionist (role-routed) |
-
-> The mobile app (`lib/`) and the two web apps (`web-admin/`, `web-staff/`) are
-> entirely separate codebases. They share nothing but the backend's HTTP contract.
-> The mobile app remains available for doctor/lab/receptionist too — staff can use
-> phone or web; admins are web-only; patients are mobile-only.
+| `web-admin/`  | React 18 + TS (Vite, :5173) | **Admin web app** — administrators only |
+| `web-staff/`  | React 18 + TS (Vite, :5174) | **Staff web app** — doctor · lab worker · receptionist (role-routed) |
 
 ## The five roles
 
 | Role          | Client      | Highlights                                                        |
 | ------------- | ----------- | ----------------------------------------------------------------- |
 | Patient       | Mobile      | Health timeline, prescriptions, lab results, book appointments    |
-| Doctor        | Mobile + Web (`web-staff`) | Search patient by CNIC, encounters, prescribe (with allergy check), lab orders, review/release results, availability |
-| Lab worker    | Mobile + Web (`web-staff`) | Priority order queue, sample tracking, result upload (masked patient identity) |
-| Receptionist  | Mobile + Web (`web-staff`) | Clinic schedule, walk-in booking, check-in (demographics only)    |
-| Admin         | Web (`web-admin`) | Approve doctors/labs, suspend/reactivate users, clinics, dashboard, audit log |
+| Doctor        | Mobile + Web | Search patient by CNIC, encounters, prescribe (allergy check), lab orders, review/release results, availability |
+| Lab worker    | Mobile + Web | Priority order queue, sample tracking, result upload (masked patient identity) |
+| Receptionist  | Mobile + Web | Clinic schedule, walk-in booking, check-in (demographics only)    |
+| Admin         | Web         | Approve doctors/labs, suspend/reactivate users, clinics, dashboard, audit log |
 
-## Architecture decision
+## Setup
 
-The prototype uses the existing **Node/Express** backend as its API layer with an
-in-memory data store that mirrors the 12 prototype tables. Supabase/PostgreSQL,
-HAPI FHIR, NADRA verification, OTP/MFA, and offline mode remain **production**
-concerns (per the scope document) and are intentionally out of scope here.
+### 1. Provision Supabase (once)
 
-## Running the prototype
-
-### 1. Backend (required by both apps)
+Follow **`supabase/SUPABASE_SETUP.md`**. In order, run against your project's SQL
+editor: `schema.sql` → `cards.sql` → `revision.sql` → `security.sql` →
+`fix_demo_login.sql`. `security.sql` is **mandatory** — it hardens the RLS
+policies. Then, in the dashboard, turn OFF Authentication → Email → "Confirm
+email". Optionally deploy the Edge Function:
 
 ```bash
-cd backend
-npm install
-npm start          # http://localhost:3000   (API under /api)
+supabase functions deploy admin-create-user
 ```
 
-### 2. Web apps
+### 2. Configure each client's environment
+
+Supabase URL + **publishable** key are read from environment (never the
+service-role key). Copy the example files and fill in your project values:
 
 ```bash
-# Admin web app
-cd web-admin && npm install && npm run dev     # http://localhost:5173
-
-# Staff web app (doctor / lab worker / receptionist)
-cd web-staff && npm install && npm run dev     # http://localhost:5174
+cp web-admin/.env.example web-admin/.env       # VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY
+cp web-staff/.env.example web-staff/.env
 ```
 
-Both proxy `/api` → `:3000`. The admin app accepts only `admin` accounts; the
-staff app accepts `doctor`, `lab_worker`, and `receptionist` (role-routed into
-the right workspace). Each uses its own session key so they can run side by side.
-
-### 3. Mobile app (Flutter)
+For Flutter, pass them at build time:
 
 ```bash
-# From the repo root. Requires Windows Developer Mode enabled for plugin symlinks.
+flutter run \
+  --dart-define=SUPABASE_URL=https://<ref>.supabase.co \
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+If unset, all three fall back to the shared dev/demo project baked into source.
+
+### 3. Run the web apps
+
+```bash
+cd web-admin && npm install && npm run dev     # http://localhost:5173  (admins only)
+cd web-staff && npm install && npm run dev     # http://localhost:5174  (doctor/lab/receptionist)
+```
+
+### 4. Run the mobile app (Flutter)
+
+```bash
 flutter pub get
-flutter run --dart-define=WIFI_IP=<your-machine-LAN-IP>
+flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_PUBLISHABLE_KEY=...
 ```
 
-Point the mobile app at your machine's LAN IP (see `lib/services/api_config.dart`)
-so a physical device can reach the backend.
+> Flutter on Windows needs **Developer Mode** (`ms-settings:developers`) enabled
+> for plugin symlinks before `flutter pub get` will succeed.
 
 ## Demo accounts (password: `password123`)
 
@@ -82,20 +111,38 @@ so a physical device can reach the backend.
 | Receptionist  | `3520166666661`   |
 | Admin (web)   | `3520100000001`   |
 
-There is also a **pending** doctor (`3520188888882`) and a **pending lab** so the
-admin approval queue is populated for a live demo.
+A **pending** doctor (`3520188888882`) is seeded so the admin approval queue is
+populated for a live demo. Passwords are bcrypt-hashed in Postgres.
 
-## Status & setup notes
+## Known production gaps (tracked, being hardened phase-by-phase)
 
-The full prototype scope (P-FR-001 … P-FR-055) is implemented across backend, web, and mobile and verified end-to-end. Two environment notes:
+- **OTP** — signup OTP is a hardcoded demo code (`11111`); a real OTP/SMS
+  provider is not yet wired.
+- **Device push (FCM)** — notifications are in-app only; background push needs a
+  Firebase project + `google-services.json`.
+- **MFA, password policy, rate limiting, legal/compliance pages, CI/CD** —
+  in progress. Do not consider this production-ready until these land and are
+  verified end-to-end.
 
-- **Flutter requires Windows Developer Mode** (`ms-settings:developers`) for plugin symlinks before `flutter pub get` will succeed. The mobile app adds the `file_picker` plugin (lab result upload), so this is required to build.
-- **Device push (FCM)** is the one remaining *production* add-on: notifications are created server-side and delivered **in-app** (every role can read `/me/notifications`; the patient app shows them live). Background push to the device needs a Firebase project + `google-services.json`, which is outside the prototype stack per the scope document.
+### Recently landed
+- **Real messaging** — patient↔doctor chat now runs on Supabase (`conversations`
+  + `messages`, participant-only RLS, realtime). Patient side in the Flutter app;
+  doctor side in `web-staff` (**Messages**). Requires `supabase/chat.sql` applied.
+  The old fake chat (Node stub, mock fallback, simulated replies) is gone.
+- **Security hardening** (`supabase/security_hardening.sql`) — `is_staff()` gated on
+  active status, `card-photos` write locked to owner, append-only + IP/device-stamped
+  audit logs, password policy on all sign-up forms. Verified by the RLS test suite
+  (`supabase/tests`).
+- **CI/CD** — GitHub Actions (`.github/workflows`): web typecheck/build, Flutter
+  analyze/test, RLS suite, CodeQL, Dependabot. See `docs/DEPLOYMENT.md`.
+- **Compliance** — legal pages (Privacy/Terms) in all clients, consent recorded at
+  sign-up (`consents`), self-service data export (`export_my_data()`), account-deletion
+  requests + admin queue + `delete-account` Edge Function. Legal docs in `docs/legal/`.
+  Requires `supabase/compliance.sql` applied.
 
 ## Where the spec maps to code
 
-- API surface (Scope §11) → `backend/src/routes/*.routes.js`
-- DB schema (Scope §4) → `backend/src/store.js` + `backend/src/seed.js`
-- RBAC & audit (Scope §12, §15) → `backend/src/middleware.js`, `backend/src/audit.js`
-- State machines (Scope §10) → status transitions in the route handlers
-- Role permission matrix (Scope §13) → `requireRole(...)` guards per route
+- DB schema, RLS, triggers, seed → `supabase/*.sql`
+- Privileged server ops → `supabase/functions/*`
+- Client data access → `lib/services/*` (Flutter), `web-*/src/api/*` (React)
+- Setup + demo accounts → `supabase/SUPABASE_SETUP.md`

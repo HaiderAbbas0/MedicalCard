@@ -1,10 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../controllers/auth_controller.dart';
+import '../../data/legal_text.dart';
+import '../../services/compliance_service.dart';
 import '../../services/supabase_client.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -261,6 +266,7 @@ class _ConsentManagementScreenState extends State<ConsentManagementScreen> {
   ];
   final Map<String, bool> _state = {};
   bool _loading = true;
+  bool _busy = false;
 
   @override
   void initState() {
@@ -316,6 +322,173 @@ class _ConsentManagementScreenState extends State<ConsentManagementScreen> {
             ]),
             const SizedBox(height: 12),
           ],
+        const SizedBox(height: 8),
+        const _SectionTitle('LEGAL'),
+        const SizedBox(height: 10),
+        _card(context, children: [
+          _navRow(context, Icons.privacy_tip_outlined, 'Privacy Policy',
+              () => context.push('/legal/privacy')),
+          Divider(height: 22, color: context.c.border2),
+          _navRow(context, Icons.description_outlined, 'Terms & Conditions',
+              () => context.push('/legal/terms')),
+        ]),
+        const SizedBox(height: 20),
+        const _SectionTitle('YOUR DATA'),
+        const SizedBox(height: 10),
+        _card(context, children: [
+          _navRow(context, Icons.download_rounded, 'Download my data',
+              _busy ? null : _export),
+          Divider(height: 22, color: context.c.border2),
+          _navRow(context, Icons.delete_outline_rounded, 'Delete my account',
+              _busy ? null : _requestDelete,
+              danger: true),
+        ]),
+      ],
+    );
+  }
+
+  Widget _navRow(BuildContext context, IconData icon, String label,
+      VoidCallback? onTap,
+      {bool danger = false}) {
+    final c = context.c;
+    return PressScale(
+      onTap: onTap ?? () {},
+      semanticLabel: label,
+      child: Opacity(
+        opacity: onTap == null ? 0.5 : 1,
+        child: Row(children: [
+          Icon(icon, size: 20, color: danger ? c.danger : c.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(label,
+                style: AppText.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: danger ? c.danger : c.text)),
+          ),
+          Icon(Icons.chevron_right_rounded, size: 22, color: c.text3),
+        ]),
+      ),
+    );
+  }
+
+  Future<void> _export() async {
+    setState(() => _busy = true);
+    try {
+      final data = await ComplianceService().exportMyData();
+      final pretty = const JsonEncoder.withIndent('  ').convert(data);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Text('Your data'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: SelectableText(pretty,
+                  style:
+                      const TextStyle(fontSize: 12, fontFamily: 'monospace')),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: pretty));
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Copied to clipboard.')));
+              },
+              child: const Text('Copy'),
+            ),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close')),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _requestDelete() async {
+    final reasonCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Delete your account?'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text(
+              'This submits a request to permanently delete your account and all '
+              'your data. An administrator will process it. This cannot be undone.'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: reasonCtrl,
+            decoration: const InputDecoration(hintText: 'Reason (optional)'),
+          ),
+        ]),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Request deletion')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _busy = true);
+    try {
+      await ComplianceService().requestAccountDeletion(reasonCtrl.text);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:
+              Text('Deletion request submitted. You will be signed out.')));
+      await context.read<AuthController>().signOut();
+      if (mounted) context.go('/login');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Request failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+}
+
+// ── Legal document viewer ─────────────────────────────────────────────────────
+class LegalDocScreen extends StatelessWidget {
+  final String title;
+  final String body;
+  const LegalDocScreen({super.key, required this.title, required this.body});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return _SettingsScaffold(
+      title: title,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: c.warnBg,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Text(LegalText.disclaimer,
+              style: AppText.caption.copyWith(color: c.warn)),
+        ),
+        const SizedBox(height: 10),
+        Text('Version ${LegalText.version} · Last updated ${LegalText.lastUpdated}',
+            style: AppText.small.copyWith(color: c.text3)),
+        const SizedBox(height: 16),
+        Text(body, style: AppText.body.copyWith(color: c.text2, height: 1.5)),
       ],
     );
   }

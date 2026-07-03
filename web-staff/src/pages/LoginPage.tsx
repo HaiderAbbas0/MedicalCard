@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
 export default function LoginPage() {
@@ -51,6 +51,9 @@ export default function LoginPage() {
         </p>
         <p className="muted" style={{ fontSize: 12, marginTop: 8, textAlign: 'center' }}>
           Demo (password123): doctor 3520199999991 · lab 3520177777771 · reception 3520166666661
+        </p>
+        <p className="muted" style={{ fontSize: 12, marginTop: 8, textAlign: 'center' }}>
+          <Link to="/legal/privacy">Privacy Policy</Link> · <Link to="/legal/terms">Terms of Service</Link>
         </p>
       </form>
     </div>

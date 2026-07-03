@@ -23,6 +23,7 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/profile/edit_profile_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/settings/settings_pages.dart';
+import 'data/legal_text.dart';
 import 'screens/doctor/doctor_home_screen.dart';
 import 'screens/lab/lab_home_screen.dart';
 import 'screens/receptionist/reception_home_screen.dart';
@@ -110,6 +111,14 @@ final appRouter = GoRouter(
     GoRoute(
         path: '/settings/help',
         pageBuilder: (_, s) => _fadePage(const HelpSupportScreen(), s)),
+    GoRoute(
+        path: '/legal/privacy',
+        pageBuilder: (_, s) => _fadePage(
+            const LegalDocScreen(title: 'Privacy Policy', body: LegalText.privacy), s)),
+    GoRoute(
+        path: '/legal/terms',
+        pageBuilder: (_, s) => _fadePage(
+            const LegalDocScreen(title: 'Terms & Conditions', body: LegalText.terms), s)),
     GoRoute(
         path: '/edit-profile',
         pageBuilder: (_, s) => _fadePage(const EditProfileScreen(), s)),

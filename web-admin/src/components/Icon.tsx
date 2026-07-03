@@ -12,6 +12,9 @@ const PATHS: Record<string, string> = {
   pill: 'M10.5 20.5a5.5 5.5 0 01-7.78-7.78l8.5-8.5a5.5 5.5 0 017.78 7.78l-8.5 8.5zM8.5 8.5l7 7',
   building: 'M3 21h18M5 21V5a2 2 0 012-2h10a2 2 0 012 2v16M9 7h1m4 0h1M9 11h1m4 0h1M9 15h1m4 0h1',
   reception: 'M3 21h18M4 21v-8h16v8M6 13V8a6 6 0 0112 0v5M9 21v-3a3 3 0 016 0v3',
+  trash: 'M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14M10 11v6M14 11v6',
+  bell: 'M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0',
+  card: 'M3 5h18a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1zM2 10h20M6 15h4',
 };
 
 export default function Icon({ name, size = 18 }: { name: string; size?: number }) {

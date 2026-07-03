@@ -69,6 +69,48 @@ export interface DashboardStats {
   total_labs: number;
 }
 
+export type DeletionStatus = 'pending' | 'processing' | 'completed' | 'rejected';
+
+export interface DeletionRequest {
+  id: string;
+  user_id: string;
+  reason: string | null;
+  status: DeletionStatus;
+  note: string | null;
+  requested_at: string;
+  processed_at: string | null;
+  processed_by: string | null;
+  full_name: string | null;
+  cnic: string | null;
+}
+
+export interface AppNotification {
+  id: string;
+  recipient_id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  is_read: boolean;
+  resource_id: string | null;
+  created_at: string;
+}
+
+export type CardStatus = 'virtual' | 'physical_requested' | 'delivered';
+
+export interface CardDelivery {
+  id: string;
+  profile_id: string;
+  card_number: string;
+  name_en: string | null;
+  status: CardStatus;
+  delivery_address: string | null;
+  delivery_phone: string | null;
+  delivery_fee_pkr: number | null;
+  updated_at: string;
+  full_name: string | null;
+  cnic: string | null;
+}
+
 export interface AuditEntry {
   id: string;
   actor_id: string | null;

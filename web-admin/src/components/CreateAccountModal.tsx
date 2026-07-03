@@ -11,6 +11,13 @@ const ROLE_LABELS: Record<StaffRole, string> = {
   admin: 'Administrator',
 };
 
+/** Password policy: at least 8 characters, with a letter and a number. */
+function passwordPolicyError(pw: string): string | null {
+  if (pw.length < 8) return 'Password must be at least 8 characters.';
+  if (!/[A-Za-z]/.test(pw) || !/\d/.test(pw)) return 'Password needs at least one letter and one number.';
+  return null;
+}
+
 /**
  * Create a staff account: receptionist (scoped to a clinic), lab worker (scoped
  * to a lab), or admin (super-admin only — P-FR-004 / P-FR-050).
@@ -53,6 +60,8 @@ export default function CreateAccountModal({
     setError('');
     if (form.cnic.trim().length !== 13) return setError('CNIC must be exactly 13 digits.');
     if (!form.full_name.trim() || !form.password) return setError('Full name and password are required.');
+    const pwErr = passwordPolicyError(form.password);
+    if (pwErr) return setError(pwErr);
     if (role === 'receptionist' && !form.clinic_id) return setError('Select a clinic for the receptionist.');
     if (role === 'lab_worker' && !form.lab_id) return setError('Select a lab for the lab worker.');
 

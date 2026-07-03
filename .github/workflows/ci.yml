@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web · ${{ matrix.app }} (typecheck · build · audit)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [web-admin, web-staff]
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - run: npm ci
+      # `npm run build` = `tsc -b && vite build` → this is the typecheck + build gate.
+      - name: Typecheck and build
+        run: npm run build
+      - name: Dependency audit (high severity+)
+        run: npm audit --audit-level=high
+        continue-on-error: true
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-dist
+          path: ${{ matrix.app }}/dist
+          if-no-files-found: error
+
+  flutter:
+    name: Flutter (analyze · test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      - run: flutter pub get
+      - name: Static analysis
+        run: flutter analyze
+      - name: Unit / widget tests
+        run: flutter test
+
+  rls:
+    name: RLS policy suite (Supabase)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: supabase/tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: supabase/tests/package-lock.json
+      - run: npm ci
+      # Runs against the project in secrets if set, else the committed dev/demo
+      # project (publishable key only — no service-role secret is ever needed).
+      - name: Verify Row Level Security policies
+        run: npm test
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}

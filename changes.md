@@ -1,3 +1,8 @@
+> ⚠️ **HISTORICAL — describes the retired in-memory Node/Express prototype.**
+> The production architecture is now **Supabase-first** (see the root `README.md`).
+> The `/backend` folder and `.env`/`WIFI_IP` setup described below no longer exist.
+> Kept only as a record of the earlier prototype.
+
 # Changes Log — SehatID Patient App & Local Backend Setup
 
 This document describes all the changes made to the codebase since cloning the repository, explained in plain language.

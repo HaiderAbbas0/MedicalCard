@@ -62,6 +62,15 @@ class _SignupScreenState extends State<SignupScreen> {
     return null;
   }
 
+  /// Password policy: at least 8 characters, with a letter and a number.
+  String? _validatePassword(String v) {
+    if (v.length < 8) return 'Password must be at least 8 characters.';
+    if (!RegExp(r'[A-Za-z]').hasMatch(v) || !RegExp(r'\d').hasMatch(v)) {
+      return 'Password needs at least one letter and one number.';
+    }
+    return null;
+  }
+
   bool get _enabled {
     final phoneDigits = _phone.text.replaceAll(RegExp(r'\D'), '');
     final phoneOk = phoneDigits.length == 11;
@@ -69,7 +78,7 @@ class _SignupScreenState extends State<SignupScreen> {
     return _name.text.trim().isNotEmpty &&
         phoneOk &&
         emailOk &&
-        _pw.text.isNotEmpty &&
+        _validatePassword(_pw.text) == null &&
         _dob != null &&
         _consent;
   }
@@ -95,6 +104,14 @@ class _SignupScreenState extends State<SignupScreen> {
       _emailError = emailErr;
     });
     if (phoneErr != null || emailErr != null) return;
+
+    final pwErr = _validatePassword(_pw.text);
+    if (pwErr != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(pwErr), backgroundColor: Colors.red[800]),
+      );
+      return;
+    }
 
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);

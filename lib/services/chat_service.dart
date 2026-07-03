@@ -1,118 +1,136 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/chat_models.dart';
-import 'api_config.dart';
-import 'auth_service.dart';
+import 'supabase_client.dart';
 
+/// Real patient↔doctor messaging backed by Supabase (`conversations` +
+/// `messages` tables, see `supabase/chat.sql`). Replaces the old demo Node/HTTP
+/// chat stub — there is no mock fallback and no simulated replies.
 class ChatService {
-  static const String _baseUrl = ApiConfig.baseUrl;
+  SupabaseClient get _db => db;
 
-  final http.Client _client;
-
-  ChatService({http.Client? client}) : _client = client ?? http.Client();
-
-  /// Fetches conversations list.
-  Future<List<Conversation>> fetchConversations(String token) async {
-    final url = Uri.parse('$_baseUrl/patient/conversations');
-    try {
-      final response = await _client.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-      if (response.statusCode == 200) {
-        final List<dynamic> body = jsonDecode(response.body) as List;
-        return body.map((c) => Conversation.fromJson(c as Map<String, dynamic>)).toList();
-      } else {
-        throw ApiException('Failed to load conversations', statusCode: response.statusCode);
-      }
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      debugPrint('ChatService: Fetch conversations failed. Falling back to mock data.');
-      await Future.delayed(const Duration(milliseconds: 600));
-
-      return [
-        Conversation(
-          doctorId: 'imran',
-          initials: 'IY',
-          name: 'Dr. Imran Yousuf',
-          last: 'Yes, same dose. I’ve added it to your…',
-          time: '09:21',
-          unread: 1,
-          online: true,
-          messages: [
-            ChatMessage(text: 'Your BP readings look stable. Keep logging twice daily.', fromMe: false, time: '09:12'),
-            ChatMessage(text: 'Thank you doctor. Should I continue Amlodipine?', fromMe: true, time: '09:20'),
-            ChatMessage(text: 'Yes, same dose. I’ve added it to your prescriptions.', fromMe: false, time: '09:21'),
-          ],
-        ),
-        Conversation(
-          doctorId: 'sana',
-          initials: 'ST',
-          name: 'Dr. Sana Tariq',
-          last: 'Your HbA1c looks much better.',
-          time: 'Yesterday',
-          unread: 0,
-          online: false,
-          messages: [
-            ChatMessage(text: 'I uploaded my fasting sugar log for the week.', fromMe: true, time: '18:02'),
-            ChatMessage(text: 'Your HbA1c looks much better. Well done!', fromMe: false, time: '18:30'),
-          ],
-        ),
-        Conversation(
-          doctorId: 'care',
-          initials: 'SC',
-          name: 'Hayaat Care Team',
-          last: 'Welcome to HayaatID 👋',
-          time: 'Mon',
-          unread: 0,
-          online: false,
-          messages: [
-            ChatMessage(text: 'Welcome to HayaatID 👋 We’re here if you need anything.', fromMe: false, time: 'Mon'),
-          ],
-        ),
-      ];
+  String _fmtTime(DateTime dtUtc) {
+    final l = dtUtc.toLocal();
+    final now = DateTime.now();
+    final sameDay = l.year == now.year && l.month == now.month && l.day == now.day;
+    if (sameDay) {
+      return '${l.hour.toString().padLeft(2, '0')}:${l.minute.toString().padLeft(2, '0')}';
     }
+    final days = now.difference(l).inDays;
+    if (days <= 1) return 'Yesterday';
+    if (days < 7) {
+      const w = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return w[l.weekday - 1];
+    }
+    return '${l.day}/${l.month}';
   }
 
-  /// Sends a chat message.
-  Future<ChatMessage> sendMessage(String token, String doctorId, String text) async {
-    final url = Uri.parse('$_baseUrl/patient/chat/send');
-    try {
-      final response = await _client.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'doctorId': doctorId,
-          'message': text,
-        }),
-      );
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final Map<String, dynamic> body = jsonDecode(response.body) as Map<String, dynamic>;
-        return ChatMessage.fromJson(body);
-      } else {
-        throw ApiException('Failed to send message', statusCode: response.statusCode);
-      }
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      debugPrint('ChatService: Send message failed. Simulating local message append.');
-      await Future.delayed(const Duration(milliseconds: 200));
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return 'Dr';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1)).toUpperCase();
+  }
 
-      final now = DateTime.now();
-      final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-      return ChatMessage(
-        text: text,
-        fromMe: true,
-        time: timeStr,
-      );
+  /// All conversations for the signed-in patient, each with its full message
+  /// history. RLS guarantees only the patient's own rows are returned.
+  Future<List<Conversation>> fetchConversations() async {
+    final uid = currentUid;
+    if (uid == null) return [];
+
+    final convRows = await _db
+        .from('conversations')
+        .select('id, doctor_id, last_message, last_message_at, doctor:profiles!doctor_id(full_name)')
+        .eq('patient_id', uid)
+        .order('last_message_at', ascending: false);
+
+    final out = <Conversation>[];
+    for (final m in convRows) {
+      final convId = m['id'] as String;
+      final doctorId = m['doctor_id'] as String;
+      final doctor = m['doctor'] as Map<String, dynamic>?;
+      final name = (doctor?['full_name'] as String?) ?? 'Doctor';
+
+      final msgRows = await _db
+          .from('messages')
+          .select('sender_id, body, created_at, read_at')
+          .eq('conversation_id', convId)
+          .order('created_at', ascending: true);
+
+      final messages = <ChatMessage>[];
+      var unread = 0;
+      for (final mm in msgRows) {
+        final fromMe = mm['sender_id'] == uid;
+        final created = DateTime.parse(mm['created_at'] as String);
+        messages.add(ChatMessage(text: mm['body'] as String, fromMe: fromMe, time: _fmtTime(created)));
+        if (!fromMe && mm['read_at'] == null) unread++;
+      }
+
+      final last = messages.isNotEmpty ? messages.last.text : ((m['last_message'] as String?) ?? '');
+      final lastAtRaw = m['last_message_at'] as String?;
+      final time = lastAtRaw != null ? _fmtTime(DateTime.parse(lastAtRaw)) : '';
+
+      out.add(Conversation(
+        conversationId: convId,
+        doctorId: doctorId,
+        initials: _initials(name),
+        name: name,
+        last: last,
+        time: time,
+        unread: unread,
+        online: false,
+        messages: messages,
+      ));
     }
+    return out;
+  }
+
+  /// Send a message from the signed-in patient to [doctorId], creating the
+  /// conversation on first contact. Throws on failure (no silent fallback).
+  Future<void> sendMessage(String doctorId, String text) async {
+    final uid = currentUid;
+    if (uid == null) throw StateError('Not signed in');
+    final body = text.trim();
+    if (body.isEmpty) return;
+
+    final rpcResult = await _db.rpc('start_conversation', params: {
+      'p_patient': uid,
+      'p_doctor': doctorId,
+    });
+    final convId = rpcResult as String;
+
+    await _db.from('messages').insert({
+      'conversation_id': convId,
+      'sender_id': uid,
+      'body': body,
+    });
+  }
+
+  /// Mark the doctor's messages in [conversationId] as read.
+  Future<void> markRead(String conversationId) async {
+    final uid = currentUid;
+    if (uid == null || conversationId.isEmpty) return;
+    await _db
+        .from('messages')
+        .update({'read_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', uid)
+        .isFilter('read_at', null);
+  }
+
+  /// Subscribe to new messages in realtime; [onEvent] fires on each insert.
+  /// Returns the channel so the caller can [unsubscribe] on teardown.
+  RealtimeChannel subscribe(void Function() onEvent) {
+    final channel = _db.channel('patient:messages').onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'messages',
+          callback: (_) => onEvent(),
+        );
+    channel.subscribe();
+    return channel;
+  }
+
+  Future<void> unsubscribe(RealtimeChannel channel) async {
+    await _db.removeChannel(channel);
   }
 }

@@ -77,6 +77,27 @@ export interface AvailabilitySlot {
   slot_duration_minutes: number;
 }
 
+// ── Messaging ─────────────────────────────────────────────────────────────────
+export interface ChatConversation {
+  id: string;
+  patient_id: string;
+  doctor_id: string;
+  last_message: string | null;
+  last_message_at: string | null;
+  created_at: string;
+  patient?: { id: string; full_name: string; cnic: string } | null;
+  unread: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+}
+
 // ── Lab worker ────────────────────────────────────────────────────────────────
 export interface LabQueueOrder {
   id: string;

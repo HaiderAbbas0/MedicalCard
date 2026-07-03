@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import Icon from './Icon';
+import NotificationBell from './NotificationBell';
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -8,6 +9,8 @@ const NAV = [
   { to: '/lab-applications', label: 'Lab Applications', icon: 'lab' },
   { to: '/users', label: 'Users', icon: 'users' },
   { to: '/clinics', label: 'Clinics', icon: 'clinic' },
+  { to: '/card-deliveries', label: 'Card Deliveries', icon: 'card' },
+  { to: '/deletion-requests', label: 'Deletion Requests', icon: 'trash' },
   { to: '/audit', label: 'Audit Log', icon: 'audit' },
 ];
 
@@ -17,6 +20,8 @@ const TITLES: Record<string, string> = {
   '/lab-applications': 'Lab Applications',
   '/users': 'User Management',
   '/clinics': 'Clinics',
+  '/card-deliveries': 'Card Deliveries',
+  '/deletion-requests': 'Account Deletion Requests',
   '/audit': 'Audit Log',
 };
 
@@ -49,6 +54,7 @@ export default function Layout() {
       <div className="main">
         <header className="topbar">
           <h1>{title}</h1>
+          <NotificationBell />
         </header>
         <main className="content">
           <Outlet />

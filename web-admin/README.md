@@ -22,17 +22,17 @@ Only accounts with role `admin` can sign in here; any other role is rejected.
 
 ## Run
 
-```bash
-# 1. start the backend API (separate terminal, from /backend)
-cd ../backend && npm install && npm start      # http://localhost:3000
+This app talks **directly to Supabase** — there is no backend to start. First
+apply the SQL in `supabase/` (see `supabase/SUPABASE_SETUP.md`), then:
 
-# 2. start the admin portal
+```bash
+cp .env.example .env    # set VITE_SUPABASE_URL + VITE_SUPABASE_PUBLISHABLE_KEY
 npm install
-npm run dev                                     # http://localhost:5173
+npm run dev             # http://localhost:5173
 ```
 
-The Vite dev server proxies `/api` → `http://localhost:3000`, so both apps share
-one origin in development.
+If `.env` is omitted, it falls back to the shared dev/demo project baked into
+`src/api/supabase.ts`.
 
 **Demo admin:** CNIC `3520100000001` · password `password123`.
 

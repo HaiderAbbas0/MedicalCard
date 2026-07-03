@@ -1,8 +1,11 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/chat_models.dart';
 import '../services/chat_service.dart';
 
+/// Drives the patient messaging UI over real Supabase data + realtime.
+/// No mock data and no simulated replies — a doctor reply arrives only when a
+/// doctor actually sends one (from the staff portal), pushed live via realtime.
 class ChatController extends ChangeNotifier {
   final ChatService _service;
 
@@ -10,8 +13,8 @@ class ChatController extends ChangeNotifier {
   bool _isLoading = false;
   bool _loaded = false;
   String? _errorMessage;
+  RealtimeChannel? _channel;
 
-  // Getters
   List<Conversation> get conversations => _conversations;
   bool get isLoading => _isLoading;
   bool get loaded => _loaded;
@@ -19,14 +22,17 @@ class ChatController extends ChangeNotifier {
 
   ChatController({ChatService? service}) : _service = service ?? ChatService();
 
-  /// Loads all conversations.
-  Future<void> loadConversations(String token) async {
+  /// Loads all conversations for the signed-in patient and starts the realtime
+  /// subscription. [token] is accepted for call-site compatibility but unused —
+  /// the Supabase client already holds the session.
+  Future<void> loadConversations([String? token]) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      _conversations = await _service.fetchConversations(token);
+      _conversations = await _service.fetchConversations();
+      _channel ??= _service.subscribe(_onRealtime);
     } catch (e) {
       _errorMessage = 'Failed to load conversations: $e';
     } finally {
@@ -36,31 +42,26 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  /// Sends a message and triggers a simulated reply if running in mock/offline mode.
+  void _onRealtime() {
+    // Any new message (mine or a doctor's) — re-pull the RLS-filtered list.
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    try {
+      _conversations = await _service.fetchConversations();
+      notifyListeners();
+    } catch (_) {
+      // Transient; keep the current view. Next event or reload will recover.
+    }
+  }
+
+  /// Sends a message to [doctorId]. [token] retained for call-site compatibility.
   Future<bool> sendMessage(String token, String doctorId, String text) async {
     if (text.trim().isEmpty) return false;
-
     try {
-      final chatMsg = await _service.sendMessage(token, doctorId, text);
-
-      // Find active conversation
-      final index = _conversations.indexWhere((c) => c.doctorId == doctorId);
-      if (index != -1) {
-        final convo = _conversations[index];
-        final updatedMessages = List<ChatMessage>.from(convo.messages)..add(chatMsg);
-        
-        _conversations[index] = convo.copyWith(
-          last: text,
-          time: chatMsg.time,
-          messages: updatedMessages,
-        );
-        notifyListeners();
-
-        // Simulate reply if using mock service (token starts with 'demo_' or 'mock_')
-        if (token.startsWith('demo_') || token.startsWith('mock_')) {
-          _simulateDoctorReply(doctorId);
-        }
-      }
+      await _service.sendMessage(doctorId, text);
+      await _refresh();
       return true;
     } catch (e) {
       _errorMessage = 'Failed to send message: $e';
@@ -69,57 +70,38 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  /// Simulates a doctor replying after a brief delay.
-  void _simulateDoctorReply(String doctorId) {
-    Timer(const Duration(milliseconds: 1500), () {
-      final index = _conversations.indexWhere((c) => c.doctorId == doctorId);
-      if (index == -1) return;
-
-      final convo = _conversations[index];
-      
-      String replyText = 'Thank you for your message. I will review it and get back to you shortly.';
-      if (doctorId == 'imran') {
-        replyText = 'Please continue taking your medication as prescribed and record your daily BP readings.';
-      } else if (doctorId == 'sana') {
-        replyText = 'Your fasting sugar level is looking better. Keep up the low-carb diet.';
-      } else if (doctorId == 'care') {
-        replyText = 'Understood. If you need any assistance regarding your health card, let us know!';
-      }
-
-      final now = DateTime.now();
-      final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-      
-      final replyMsg = ChatMessage(
-        text: replyText,
-        fromMe: false,
-        time: timeStr,
-      );
-
-      final updatedMessages = List<ChatMessage>.from(convo.messages)..add(replyMsg);
-      _conversations[index] = convo.copyWith(
-        last: replyText,
-        time: timeStr,
-        unread: convo.unread + 1,
-        messages: updatedMessages,
-      );
-      notifyListeners();
-    });
-  }
-
-  /// Marks a conversation as read.
-  void markAsRead(String doctorId) {
+  /// Marks the doctor's messages in a conversation as read.
+  Future<void> markAsRead(String doctorId) async {
     final index = _conversations.indexWhere((c) => c.doctorId == doctorId);
-    if (index != -1 && _conversations[index].unread > 0) {
-      _conversations[index] = _conversations[index].copyWith(unread: 0);
-      notifyListeners();
-    }
+    if (index == -1) return;
+    final convo = _conversations[index];
+    if (convo.unread == 0) return;
+
+    _conversations[index] = convo.copyWith(unread: 0);
+    notifyListeners();
+    await _service.markRead(convo.conversationId);
   }
 
-  /// Clears stored chat history on logout.
+  /// Clears state and tears down realtime on logout.
   void clear() {
+    _teardown();
     _conversations = [];
     _loaded = false;
     _errorMessage = null;
     notifyListeners();
+  }
+
+  void _teardown() {
+    final ch = _channel;
+    if (ch != null) {
+      _channel = null;
+      _service.unsubscribe(ch);
+    }
+  }
+
+  @override
+  void dispose() {
+    _teardown();
+    super.dispose();
   }
 }

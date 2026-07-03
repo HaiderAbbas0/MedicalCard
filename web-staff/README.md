@@ -9,10 +9,13 @@ A slate sidebar distinguishes this staff portal from the teal admin portal.
 
 ## Run
 
+This app talks **directly to Supabase** — there is no backend to start. First
+apply the SQL in `supabase/` (see `supabase/SUPABASE_SETUP.md`), then:
+
 ```bash
-# backend must be running (../backend → npm start, :3000)
+cp .env.example .env    # set VITE_SUPABASE_URL + VITE_SUPABASE_PUBLISHABLE_KEY
 npm install
-npm run dev        # http://localhost:5174  (proxies /api → :3000)
+npm run dev             # http://localhost:5174
 ```
 
 Only `doctor`, `lab_worker`, and `receptionist` accounts can sign in here.
