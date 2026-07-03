@@ -56,7 +56,10 @@ final appRouter = GoRouter(
     GoRoute(path: '/language', builder: (_, _) => const LanguageScreen()),
     GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
     GoRoute(path: '/signup', builder: (_, _) => const SignupScreen()),
-    GoRoute(path: '/otp', builder: (_, _) => const OtpScreen()),
+    GoRoute(
+        path: '/otp',
+        builder: (_, state) => OtpScreen(
+            pendingSignup: state.extra as Map<String, dynamic>?)),
 
     // ── Role home screens (doctor / lab / receptionist / admin) ──────────
     GoRoute(path: '/doctor', builder: (_, _) => const DoctorHomeScreen()),

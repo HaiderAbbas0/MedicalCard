@@ -12,7 +12,11 @@ import '../../widgets/common/otp_field.dart';
 import '../../widgets/common/press_scale.dart';
 
 class OtpScreen extends StatefulWidget {
-  const OtpScreen({super.key});
+  /// Pending sign-up data passed from the signup screen.
+  /// When null, the screen is used standalone (e.g. password-reset flow).
+  final Map<String, dynamic>? pendingSignup;
+
+  const OtpScreen({super.key, this.pendingSignup});
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -22,6 +26,7 @@ class _OtpScreenState extends State<OtpScreen> {
   final _key = GlobalKey<OtpFieldState>();
   String _code = '';
   bool _error = false;
+  bool _busy = false;
   int _seconds = 45;
   Timer? _timer;
 
@@ -51,87 +56,175 @@ class _OtpScreenState extends State<OtpScreen> {
     super.dispose();
   }
 
+  // ── Back-press intercept ─────────────────────────────────────────────────────
+  Future<bool> _onWillPop() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Cancel sign-up?'),
+        content: const Text(
+            'Are you sure you want to go back? Your progress will be lost and sign-up will be cancelled.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Stay')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Cancel sign-up')),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      _timer?.cancel();
+      return true;
+    }
+    return false;
+  }
+
+  // ── OTP verification & deferred account creation ────────────────────────────
   Future<void> _verify() async {
-    final auth = context.read<AuthController>();
-    if (auth.verifyOtp(_code)) {
-      await auth.completeLogin();
-      if (mounted) context.go('/dashboard');
-    } else {
+    // Demo OTP gate: code must be '11111'.
+    if (_code != '11111') {
       _key.currentState?.shake();
       setState(() => _error = true);
+      return;
+    }
+
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      // If this screen was reached from the signup form, create the account now.
+      if (widget.pendingSignup != null) {
+        final data = widget.pendingSignup!;
+        final ok = await context.read<AuthController>().signUp(
+              name: data['name'] as String,
+              email: data['email'] as String? ?? '',
+              phone: data['phone'] as String,
+              password: data['password'] as String,
+              gender: data['gender'] as String?,
+              dob: data['dob'] as String?,
+              emergencyPhone: data['emergencyPhone'] as String?,
+            );
+
+        if (!mounted) return;
+
+        if (!ok) {
+          final errMsg =
+              context.read<AuthController>().errorMessage ?? 'Sign up failed.';
+          messenger.showSnackBar(SnackBar(
+            content: Text(errMsg),
+            backgroundColor: Colors.red[800],
+          ));
+          setState(() => _busy = false);
+          return;
+        }
+      } else {
+        // Standalone OTP (e.g. a login step): just complete the existing session.
+        await context.read<AuthController>().completeLogin();
+      }
+
+      if (mounted) context.go('/dashboard');
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red[800],
+        ));
+        setState(() => _busy = false);
+      }
     }
   }
 
+  // ── Build ───────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    return Scaffold(
-      backgroundColor: c.bg,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _BackButton(onTap: () => context.pop()),
-              const SizedBox(height: 28),
-              Container(
-                width: 62,
-                height: 62,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: c.mint,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Icon(Icons.sms_outlined, color: c.mintFg, size: 30),
-              ),
-              const SizedBox(height: 22),
-              Text(
-                'Verify your number',
-                style: AppText.display.copyWith(
-                  color: c.text,
-                  fontSize: 25,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text.rich(
-                TextSpan(
-                  style: AppText.body.copyWith(color: c.text2),
-                  children: [
-                    const TextSpan(text: 'We sent a 5-digit code to your phone. '),
-                    TextSpan(
-                      text: 'Demo code: 11111',
-                      style: AppText.bodyStrong.copyWith(color: c.primary),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
-              OtpField(
-                key: _key,
-                length: 5,
-                onChanged: (v) => setState(() {
-                  _code = v;
-                  _error = false;
+
+    return PopScope(
+      // Intercept hardware back button and in-app back navigation.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final shouldPop = await _onWillPop();
+        if (shouldPop && context.mounted) context.pop();
+      },
+      child: Scaffold(
+        backgroundColor: c.bg,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Back button also triggers the confirmation dialog.
+                _BackButton(onTap: () async {
+                  final shouldPop = await _onWillPop();
+                  if (shouldPop && context.mounted) context.pop();
                 }),
-              ),
-              if (_error) ...[
-                const SizedBox(height: 14),
+                const SizedBox(height: 28),
+                Container(
+                  width: 62,
+                  height: 62,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: c.mint,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Icon(Icons.sms_outlined, color: c.mintFg, size: 30),
+                ),
+                const SizedBox(height: 22),
                 Text(
-                  'Incorrect code. Please try again.',
-                  style: AppText.caption.copyWith(color: c.danger),
+                  'Verify your number',
+                  style: AppText.display.copyWith(
+                    color: c.text,
+                    fontSize: 25,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text.rich(
+                  TextSpan(
+                    style: AppText.body.copyWith(color: c.text2),
+                    children: [
+                      const TextSpan(
+                          text: 'We sent a 5-digit code to your phone. '),
+                      TextSpan(
+                        text: 'Demo code: 11111',
+                        style: AppText.bodyStrong.copyWith(color: c.primary),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+                OtpField(
+                  key: _key,
+                  length: 5,
+                  onChanged: (v) => setState(() {
+                    _code = v;
+                    _error = false;
+                  }),
+                ),
+                if (_error) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    'Incorrect code. Please try again.',
+                    style: AppText.caption.copyWith(color: c.danger),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                Center(child: _ResendLine(seconds: _seconds, onResend: _startTimer)),
+                const SizedBox(height: 24),
+                GradientButton(
+                  label: 'Verify & create account',
+                  enabled: _code.length == 5 && !_busy,
+                  loading: _busy,
+                  onPressed: _code.length == 5 && !_busy ? _verify : null,
                 ),
               ],
-              const SizedBox(height: 24),
-              Center(child: _ResendLine(seconds: _seconds, onResend: _startTimer)),
-              const SizedBox(height: 24),
-              GradientButton(
-                label: 'Verify & continue',
-                enabled: _code.length == 5,
-                onPressed: _code.length == 5 ? _verify : null,
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -158,9 +251,9 @@ class _ResendLine extends StatelessWidget {
       onTap: onResend,
       semanticLabel: 'Resend code',
       child: Text(
-        'Didn’t get it? Resend code',
-        style: AppText.caption
-            .copyWith(color: c.primary, fontWeight: FontWeight.w700),
+        'Didn\'t get it? Resend code',
+        style:
+            AppText.caption.copyWith(color: c.primary, fontWeight: FontWeight.w700),
       ),
     );
   }
