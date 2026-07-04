@@ -9,59 +9,92 @@ lab with consent. This repository implements the system described in
 ## Architecture: Supabase-first (single production backend)
 
 **Supabase is the one production backend.** All three client apps talk to it
-directly — there is no separate application API server in production.
+directly — there is no separate application API server.
 
 ```
                          ┌──────────────────────────────────────┐
                          │              Supabase                 │
    Flutter (lib/) ─────► │  Auth · Postgres (RLS) · Storage ·    │
-   web-admin/     ─────► │  Edge Functions (service-role only)   │
-   web-staff/     ─────► │                                       │
+   web-admin/     ─────► │  Realtime · Edge Functions            │
+   web-staff/     ─────► │  (service-role, server-only)          │
                          └──────────────────────────────────────┘
 ```
 
 | Layer | Responsibility |
 | ----- | -------------- |
-| **Supabase Auth** | Identity, sessions, JWTs. Login via CNIC/phone/card-number → `<id>@hayaat.id`. |
-| **Supabase Postgres** | All data. 21 tables, **Row Level Security on every table**, `SECURITY DEFINER` role helpers, triggers. See `supabase/`. |
-| **Supabase Storage** | `lab-results` (private, signed-URL access) and `card-photos` buckets. |
-| **Supabase Edge Functions** | Privileged, server-only operations that must use the service-role key (e.g. `admin-create-user`). Never done from the client. |
+| **Supabase Auth** | Identity, sessions, JWTs. Login via CNIC / phone / card-number → `<id>@hayaat.id`. |
+| **Supabase Postgres** | All data. **Row Level Security on every table** (verified by an automated suite), `SECURITY DEFINER` role helpers, triggers, audit log. See `supabase/`. |
+| **Supabase Storage** | `lab-results` (private, signed-URL access) and `card-photos` (owner-write) buckets. |
+| **Supabase Realtime** | Live delivery of chat messages between patient and doctor. |
+| **Supabase Edge Functions** | Privileged, server-only operations that need the service-role key: `admin-create-user`, `delete-account`. Never done from the client. |
 
-> **The `backend/` folder (Node/Express) is demo-only and NOT part of the
-> production architecture.** It is a legacy in-memory prototype kept solely so the
-> mobile chat screen has something to call until messaging is migrated to Supabase
-> Realtime. Do not build new features against it. See `backend/README.md`.
+> There is **no application server** and no container in this architecture. The
+> earlier Node/Express prototype (`backend/`) has been **removed** — every client
+> talks to Supabase directly.
 
 ## The clients
 
-| Folder        | Stack                     | Serves                                   |
-| ------------- | ------------------------- | ---------------------------------------- |
-| `lib/`        | Flutter (Android + iOS)   | **Mobile** — patient · doctor · lab worker · receptionist |
-| `web-admin/`  | React 18 + TS (Vite, :5173) | **Admin web app** — administrators only |
-| `web-staff/`  | React 18 + TS (Vite, :5174) | **Staff web app** — doctor · lab worker · receptionist (role-routed) |
+| Folder        | Stack                        | Serves                                   |
+| ------------- | ---------------------------- | ---------------------------------------- |
+| `lib/`        | Flutter (Android + iOS)      | **Mobile** — patient · doctor · lab worker · receptionist |
+| `web-admin/`  | React 18 + TS (Vite, :5173)  | **Admin web app** — administrators only |
+| `web-staff/`  | React 18 + TS (Vite, :5174)  | **Staff web app** — doctor · lab worker · receptionist (role-routed) |
 
 ## The five roles
 
-| Role          | Client      | Highlights                                                        |
-| ------------- | ----------- | ----------------------------------------------------------------- |
-| Patient       | Mobile      | Health timeline, prescriptions, lab results, book appointments    |
-| Doctor        | Mobile + Web | Search patient by CNIC, encounters, prescribe (allergy check), lab orders, review/release results, availability |
+| Role          | Client       | Highlights                                                        |
+| ------------- | ------------ | ----------------------------------------------------------------- |
+| Patient       | Mobile       | Health timeline, prescriptions, lab results, book appointments, **chat with doctors**, digital card, **data export / account deletion** |
+| Doctor        | Mobile + Web | Search patient by CNIC, encounters, prescribe (allergy check), lab orders, review/release results, availability, **Messages** |
 | Lab worker    | Mobile + Web | Priority order queue, sample tracking, result upload (masked patient identity) |
 | Receptionist  | Mobile + Web | Clinic schedule, walk-in booking, check-in (demographics only)    |
-| Admin         | Web         | Approve doctors/labs, suspend/reactivate users, clinics, dashboard, audit log |
+| Admin         | Web          | Approve doctors/labs, suspend/reactivate users, clinics, dashboard, audit log, **notification bell**, **card-delivery queue**, **account-deletion requests** |
+
+## Implemented features
+
+- **Auth & RBAC** — Supabase Auth; roles in `profiles.role`; database-enforced
+  Row Level Security on every table. Suspended/pending staff have no data access.
+- **Clinical records** — encounters, conditions, prescriptions (with live allergy
+  check), vitals, allergies, lab orders/results (FHIR-aligned).
+- **Real messaging** — patient↔doctor chat on Supabase (`conversations` +
+  `messages`, participant-only RLS, **Realtime**). Patient side in Flutter; doctor
+  side is the `web-staff` **Messages** page. (The old fake/stub chat is gone.)
+- **Digital + physical card** — patients request a card (issued instantly with a
+  `HAY-PAT-####` number); can request physical delivery.
+- **Card workflow → admin notifications** — applying for a card, or requesting
+  delivery, sends an in-app notification to every admin (bell in the admin portal),
+  and physical requests appear in the admin **Card Deliveries** queue.
+- **Security hardening** (`supabase/security_hardening.sql`) — `is_staff()` gated
+  on active status, `card-photos` writes locked to the owner's folder, `audit_logs`
+  strictly append-only and stamped server-side with IP / device / role / time,
+  password policy on every sign-up form.
+- **Compliance** — Privacy/Terms pages in all clients, consent recorded at sign-up
+  (`consents`), self-service **data export** (`export_my_data()`), **account-deletion**
+  requests + admin queue + `delete-account` Edge Function. Legal docs in `docs/legal/`.
+- **Automated RLS test suite** (`supabase/tests/`) — signs in as every role and
+  asserts each policy.
+- **CI/CD** — GitHub Actions: web typecheck/build, Flutter analyze/test, the RLS
+  suite, CodeQL, Dependabot. See `docs/DEPLOYMENT.md`.
 
 ## Setup
 
 ### 1. Provision Supabase (once)
 
-Follow **`supabase/SUPABASE_SETUP.md`**. In order, run against your project's SQL
-editor: `schema.sql` → `cards.sql` → `revision.sql` → `security.sql` →
-`fix_demo_login.sql`. `security.sql` is **mandatory** — it hardens the RLS
-policies. Then, in the dashboard, turn OFF Authentication → Email → "Confirm
-email". Optionally deploy the Edge Function:
+Follow **[`supabase/SUPABASE_SETUP.md`](supabase/SUPABASE_SETUP.md)**. In the SQL
+editor, run these **in order** (all idempotent):
+
+```
+schema.sql → cards.sql → revision.sql → security.sql → fix_demo_login.sql
+          → chat.sql → security_hardening.sql → compliance.sql → card_workflow.sql
+```
+
+`security.sql` **and** `security_hardening.sql` are mandatory (they harden RLS).
+Then turn OFF Authentication → Email → "Confirm email" in the dashboard. Deploy the
+Edge Functions (optional but recommended):
 
 ```bash
-supabase functions deploy admin-create-user
+supabase functions deploy admin-create-user   # admins create staff/admin accounts
+supabase functions deploy delete-account       # performs the actual account erasure
 ```
 
 ### 2. Configure each client's environment
@@ -114,35 +147,46 @@ flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_PUBLISHABLE_KE
 A **pending** doctor (`3520188888882`) is seeded so the admin approval queue is
 populated for a live demo. Passwords are bcrypt-hashed in Postgres.
 
-## Known production gaps (tracked, being hardened phase-by-phase)
+## Testing & verification
 
-- **OTP** — signup OTP is a hardcoded demo code (`11111`); a real OTP/SMS
-  provider is not yet wired.
+```bash
+# Automated Row Level Security suite (signs in as every role, asserts every policy)
+cd supabase/tests && npm install && npm test          # expect: 27 passed, 0 failed
+
+# Card → admin-notification workflow, end to end
+node supabase/tests/verify_card_workflow.mjs           # expect: 6 passed, 0 failed
+
+# Web apps
+cd web-admin && npm run build                          # tsc -b + vite build
+cd web-staff && npm run build
+
+# Mobile
+flutter analyze                                        # no errors/warnings
+```
+
+Last verified (against the live dev project): RLS suite **27/27**, card workflow
+**6/6**, `flutter analyze` clean, both web apps build cleanly.
+
+## Known gaps / blocked (need credentials or a product decision)
+
+- **OTP** — sign-up OTP is a hardcoded demo code (`11111`); wiring a real OTP/SMS
+  provider (e.g. Twilio) is pending.
+- **MFA & email password reset** — need an SMS/email provider configured in
+  Supabase Auth.
 - **Device push (FCM)** — notifications are in-app only; background push needs a
   Firebase project + `google-services.json`.
-- **MFA, password policy, rate limiting, legal/compliance pages, CI/CD** —
-  in progress. Do not consider this production-ready until these land and are
-  verified end-to-end.
+- **Automated deploy** — a hosting provider hasn't been chosen; manual deploy from
+  CI build artifacts works today (see `docs/DEPLOYMENT.md`).
+- **NADRA identity verification** — out of scope per the prototype spec.
 
-### Recently landed
-- **Real messaging** — patient↔doctor chat now runs on Supabase (`conversations`
-  + `messages`, participant-only RLS, realtime). Patient side in the Flutter app;
-  doctor side in `web-staff` (**Messages**). Requires `supabase/chat.sql` applied.
-  The old fake chat (Node stub, mock fallback, simulated replies) is gone.
-- **Security hardening** (`supabase/security_hardening.sql`) — `is_staff()` gated on
-  active status, `card-photos` write locked to owner, append-only + IP/device-stamped
-  audit logs, password policy on all sign-up forms. Verified by the RLS test suite
-  (`supabase/tests`).
-- **CI/CD** — GitHub Actions (`.github/workflows`): web typecheck/build, Flutter
-  analyze/test, RLS suite, CodeQL, Dependabot. See `docs/DEPLOYMENT.md`.
-- **Compliance** — legal pages (Privacy/Terms) in all clients, consent recorded at
-  sign-up (`consents`), self-service data export (`export_my_data()`), account-deletion
-  requests + admin queue + `delete-account` Edge Function. Legal docs in `docs/legal/`.
-  Requires `supabase/compliance.sql` applied.
+Do not treat the system as fully production-ready until the OTP/MFA, push, and
+deploy items above are resolved.
 
 ## Where the spec maps to code
 
-- DB schema, RLS, triggers, seed → `supabase/*.sql`
+- DB schema, RLS, triggers, seed → `supabase/*.sql` (setup: `supabase/SUPABASE_SETUP.md`)
 - Privileged server ops → `supabase/functions/*`
+- RLS verification → `supabase/tests/`
 - Client data access → `lib/services/*` (Flutter), `web-*/src/api/*` (React)
-- Setup + demo accounts → `supabase/SUPABASE_SETUP.md`
+- CI/CD & deployment → `.github/workflows/`, `docs/DEPLOYMENT.md`
+- Legal & compliance → `docs/legal/`
