@@ -86,6 +86,7 @@ editor, run these **in order** (all idempotent):
 ```
 schema.sql → cards.sql → revision.sql → security.sql → fix_demo_login.sql
           → chat.sql → security_hardening.sql → compliance.sql → card_workflow.sql
+          → perf_indexes.sql
 ```
 
 `security.sql` **and** `security_hardening.sql` are mandatory (they harden RLS).

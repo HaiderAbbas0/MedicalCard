@@ -1,23 +1,26 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { Spinner } from './components/ui';
+import ErrorBoundary from './components/ErrorBoundary';
 import StaffLayout from './components/StaffLayout';
 import LoginPage from './pages/LoginPage';
-import DoctorRegisterPage from './pages/DoctorRegisterPage';
+
+const DoctorRegisterPage = lazy(() => import('./pages/DoctorRegisterPage'));
 // Doctor
-import AppointmentsPage from './pages/doctor/AppointmentsPage';
-import PatientLookupPage from './pages/doctor/PatientLookupPage';
-import PatientRecordPage from './pages/doctor/PatientRecordPage';
-import NewEncounterPage from './pages/doctor/NewEncounterPage';
-import LabReviewPage from './pages/doctor/LabReviewPage';
-import MessagesPage from './pages/doctor/MessagesPage';
-import AvailabilityPage from './pages/doctor/AvailabilityPage';
-import DoctorProfilePage from './pages/doctor/DoctorProfilePage';
+const AppointmentsPage = lazy(() => import('./pages/doctor/AppointmentsPage'));
+const PatientLookupPage = lazy(() => import('./pages/doctor/PatientLookupPage'));
+const PatientRecordPage = lazy(() => import('./pages/doctor/PatientRecordPage'));
+const NewEncounterPage = lazy(() => import('./pages/doctor/NewEncounterPage'));
+const LabReviewPage = lazy(() => import('./pages/doctor/LabReviewPage'));
+const MessagesPage = lazy(() => import('./pages/doctor/MessagesPage'));
+const AvailabilityPage = lazy(() => import('./pages/doctor/AvailabilityPage'));
+const DoctorProfilePage = lazy(() => import('./pages/doctor/DoctorProfilePage'));
 // Lab + Reception
-import LabQueuePage from './pages/lab/LabQueuePage';
-import SchedulePage from './pages/reception/SchedulePage';
-import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
-import TermsPage from './pages/legal/TermsPage';
+const LabQueuePage = lazy(() => import('./pages/lab/LabQueuePage'));
+const SchedulePage = lazy(() => import('./pages/reception/SchedulePage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
+const TermsPage = lazy(() => import('./pages/legal/TermsPage'));
 
 function homeFor(role: string) {
   if (role === 'lab_worker') return '/lab';
@@ -77,7 +80,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Root />
+        <ErrorBoundary>
+          <Suspense fallback={<Spinner />}>
+            <Root />
+          </Suspense>
+        </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
   );

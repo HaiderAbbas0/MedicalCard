@@ -1,18 +1,21 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { Spinner } from './components/ui';
+import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import DoctorApplicationsPage from './pages/DoctorApplicationsPage';
-import LabApplicationsPage from './pages/LabApplicationsPage';
-import UsersPage from './pages/UsersPage';
-import ClinicsPage from './pages/ClinicsPage';
-import CardDeliveriesPage from './pages/CardDeliveriesPage';
-import AuditLogPage from './pages/AuditLogPage';
-import DeletionRequestsPage from './pages/DeletionRequestsPage';
-import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
-import TermsPage from './pages/legal/TermsPage';
+
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const DoctorApplicationsPage = lazy(() => import('./pages/DoctorApplicationsPage'));
+const LabApplicationsPage = lazy(() => import('./pages/LabApplicationsPage'));
+const UsersPage = lazy(() => import('./pages/UsersPage'));
+const ClinicsPage = lazy(() => import('./pages/ClinicsPage'));
+const CardDeliveriesPage = lazy(() => import('./pages/CardDeliveriesPage'));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
+const DeletionRequestsPage = lazy(() => import('./pages/DeletionRequestsPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
+const TermsPage = lazy(() => import('./pages/legal/TermsPage'));
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
@@ -54,7 +57,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Root />
+        <ErrorBoundary>
+          <Suspense fallback={<Spinner />}>
+            <Root />
+          </Suspense>
+        </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
   );

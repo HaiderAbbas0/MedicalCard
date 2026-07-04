@@ -42,26 +42,37 @@ class ChatService {
         .select('id, doctor_id, last_message, last_message_at, doctor:profiles!doctor_id(full_name)')
         .eq('patient_id', uid)
         .order('last_message_at', ascending: false);
+    if (convRows.isEmpty) return [];
+
+    // One query for every message across all the patient's conversations, then
+    // group in memory — avoids an N+1 (a separate query per conversation).
+    final convIds = [for (final m in convRows) m['id'] as String];
+    final msgRows = await _db
+        .from('messages')
+        .select('conversation_id, sender_id, body, created_at, read_at')
+        .inFilter('conversation_id', convIds)
+        .order('created_at', ascending: true);
+
+    final byConv = <String, List<Map<String, dynamic>>>{};
+    for (final mm in msgRows) {
+      (byConv[mm['conversation_id'] as String] ??= []).add(mm);
+    }
 
     final out = <Conversation>[];
     for (final m in convRows) {
       final convId = m['id'] as String;
-      final doctorId = m['doctor_id'] as String;
       final doctor = m['doctor'] as Map<String, dynamic>?;
       final name = (doctor?['full_name'] as String?) ?? 'Doctor';
 
-      final msgRows = await _db
-          .from('messages')
-          .select('sender_id, body, created_at, read_at')
-          .eq('conversation_id', convId)
-          .order('created_at', ascending: true);
-
       final messages = <ChatMessage>[];
       var unread = 0;
-      for (final mm in msgRows) {
+      for (final mm in (byConv[convId] ?? const <Map<String, dynamic>>[])) {
         final fromMe = mm['sender_id'] == uid;
-        final created = DateTime.parse(mm['created_at'] as String);
-        messages.add(ChatMessage(text: mm['body'] as String, fromMe: fromMe, time: _fmtTime(created)));
+        messages.add(ChatMessage(
+          text: mm['body'] as String,
+          fromMe: fromMe,
+          time: _fmtTime(DateTime.parse(mm['created_at'] as String)),
+        ));
         if (!fromMe && mm['read_at'] == null) unread++;
       }
 
@@ -71,7 +82,7 @@ class ChatService {
 
       out.add(Conversation(
         conversationId: convId,
-        doctorId: doctorId,
+        doctorId: m['doctor_id'] as String,
         initials: _initials(name),
         name: name,
         last: last,
@@ -117,14 +128,19 @@ class ChatService {
         .isFilter('read_at', null);
   }
 
-  /// Subscribe to new messages in realtime; [onEvent] fires on each insert.
-  /// Returns the channel so the caller can [unsubscribe] on teardown.
-  RealtimeChannel subscribe(void Function() onEvent) {
+  /// Local echo of a message the patient just sent (shown immediately on send).
+  ChatMessage outgoing(String text) =>
+      ChatMessage(text: text, fromMe: true, time: _fmtTime(DateTime.now().toUtc()));
+
+  /// Subscribe to new messages in realtime; [onEvent] receives the inserted row
+  /// so the caller can react to just that message. Returns the channel so the
+  /// caller can [unsubscribe] on teardown.
+  RealtimeChannel subscribe(void Function(Map<String, dynamic> newRow) onEvent) {
     final channel = _db.channel('patient:messages').onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'messages',
-          callback: (_) => onEvent(),
+          callback: (payload) => onEvent(payload.newRecord),
         );
     channel.subscribe();
     return channel;

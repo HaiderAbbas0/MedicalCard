@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/chat_models.dart';
 import '../services/chat_service.dart';
+import '../services/supabase_client.dart';
 
 /// Drives the patient messaging UI over real Supabase data + realtime.
 /// No mock data and no simulated replies — a doctor reply arrives only when a
@@ -42,8 +43,10 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  void _onRealtime() {
-    // Any new message (mine or a doctor's) — re-pull the RLS-filtered list.
+  void _onRealtime(Map<String, dynamic> row) {
+    // Our own messages are shown optimistically on send — ignore the echo so we
+    // don't do a redundant reload. A doctor's reply triggers one cheap refresh.
+    if (row['sender_id'] == currentUid) return;
     _refresh();
   }
 
@@ -58,10 +61,26 @@ class ChatController extends ChangeNotifier {
 
   /// Sends a message to [doctorId]. [token] retained for call-site compatibility.
   Future<bool> sendMessage(String token, String doctorId, String text) async {
-    if (text.trim().isEmpty) return false;
+    final body = text.trim();
+    if (body.isEmpty) return false;
     try {
-      await _service.sendMessage(doctorId, text);
-      await _refresh();
+      await _service.sendMessage(doctorId, body);
+      final idx = _conversations.indexWhere((c) => c.doctorId == doctorId);
+      if (idx == -1) {
+        await _refresh(); // first message to this doctor — pull in the new conversation
+      } else {
+        // Optimistic: show it immediately and move the thread to the top; no reload.
+        final convo = _conversations[idx];
+        final msg = _service.outgoing(body);
+        _conversations
+          ..removeAt(idx)
+          ..insert(0, convo.copyWith(
+            last: body,
+            time: msg.time,
+            messages: [...convo.messages, msg],
+          ));
+        notifyListeners();
+      }
       return true;
     } catch (e) {
       _errorMessage = 'Failed to send message: $e';

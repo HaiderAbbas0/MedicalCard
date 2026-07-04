@@ -16,6 +16,7 @@ Supabase dashboard → **SQL Editor** → **New query**. Paste and **Run** each 
 7. [`security_hardening.sql`](./security_hardening.sql) — Phase-5 fixes: gate `is_staff()` on `status = 'active'` (so suspended/pending staff lose data access), restrict `card-photos` writes to the owner's folder, make `audit_logs` strictly append-only, and stamp every audit entry with the server-observed IP / device / role / time (clients can't spoof them)
 8. [`compliance.sql`](./compliance.sql) — consent storage (`consents`), account-deletion requests (`deletion_requests`), and the `export_my_data()` data-portability function
 9. [`card_workflow.sql`](./card_workflow.sql) — notifies admins in-app when a patient applies for a card or requests physical delivery, and lets admins mark cards delivered
+10. [`perf_indexes.sql`](./perf_indexes.sql) — performance indexes on the foreign-key / filter columns used by queries and RLS (patient timeline, patient search, lab queue, notifications, audit). Safe to run any time.
 
 > Order matters: `security.sql` re-defines policies created by `schema.sql`, and
 > `security_hardening.sql` re-defines `is_staff()` from `security.sql` — so run
