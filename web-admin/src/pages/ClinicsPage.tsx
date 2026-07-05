@@ -10,7 +10,11 @@ export default function ClinicsPage() {
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: '', type: 'clinic', phone: '', address_city: '', address_province: '' });
+  const [receptionist, setReceptionist] = useState({ full_name: '', employee_id: '', password: '' });
   const [busy, setBusy] = useState(false);
+
+  const receptionistFilled =
+    receptionist.full_name.trim() || receptionist.employee_id.trim() || receptionist.password.trim();
 
   function load() {
     setClinics(null);
@@ -21,11 +25,31 @@ export default function ClinicsPage() {
   async function create(e: FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
+
+    // If any receptionist field is filled, require all three before proceeding.
+    if (receptionistFilled) {
+      if (!receptionist.full_name.trim() || !receptionist.employee_id.trim() || !receptionist.password.trim()) {
+        setError('Fill out all receptionist fields (Full Name, Employee ID, Password), or leave them all blank.');
+        return;
+      }
+    }
+
     setBusy(true);
     try {
-      await adminApi.createClinic(form);
+      const clinic = await adminApi.createClinic(form);
+
+      if (receptionistFilled) {
+        await adminApi.createStaff('receptionist', {
+          full_name: receptionist.full_name.trim(),
+          employee_id: receptionist.employee_id.trim(),
+          password: receptionist.password,
+          clinic_id: clinic.id,
+        });
+      }
+
       setShowCreate(false);
       setForm({ name: '', type: 'clinic', phone: '', address_city: '', address_province: '' });
+      setReceptionist({ full_name: '', employee_id: '', password: '' });
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed.');
@@ -120,6 +144,43 @@ export default function ClinicsPage() {
               <div className="field" style={{ flex: 1 }}>
                 <label>Province</label>
                 <input className="input" value={form.address_province} onChange={(e) => setForm({ ...form, address_province: e.target.value })} />
+              </div>
+            </div>
+
+            <hr style={{ margin: '16px 0' }} />
+            <div className="field">
+              <label style={{ fontWeight: 600 }}>Receptionist Account (Optional)</label>
+              <p className="muted" style={{ marginTop: 2 }}>
+                Fill these in to create a receptionist for this clinic at the same time. They'll log
+                into the Staff Portal with their Employee ID and Password.
+              </p>
+            </div>
+            <div className="field">
+              <label>Full Name</label>
+              <input
+                className="input"
+                value={receptionist.full_name}
+                onChange={(e) => setReceptionist({ ...receptionist, full_name: e.target.value })}
+              />
+            </div>
+            <div className="row">
+              <div className="field" style={{ flex: 1 }}>
+                <label>Employee ID</label>
+                <input
+                  className="input"
+                  placeholder="e.g. REC-005"
+                  value={receptionist.employee_id}
+                  onChange={(e) => setReceptionist({ ...receptionist, employee_id: e.target.value })}
+                />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label>Password</label>
+                <input
+                  className="input"
+                  type="password"
+                  value={receptionist.password}
+                  onChange={(e) => setReceptionist({ ...receptionist, password: e.target.value })}
+                />
               </div>
             </div>
           </form>
