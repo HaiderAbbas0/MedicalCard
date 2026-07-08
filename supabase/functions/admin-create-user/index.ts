@@ -22,25 +22,49 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
     const url = Deno.env.get('SUPABASE_URL')!;
-    const anon = Deno.env.get('SUPABASE_ANON_KEY')!;
     const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Verify the caller is an admin.
-    const caller = createClient(url, anon, {
-      global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
-    });
-    const { data: ures } = await caller.auth.getUser();
-    if (!ures?.user) return json(401, { message: 'Not authenticated.' });
-    const { data: prof } = await caller.from('profiles').select('role').eq('id', ures.user.id).maybeSingle();
+    // Use the service-role client to validate the caller's JWT.
+    // This works regardless of whether the browser uses publishable key or anon key.
+    const adminClient = createClient(url, service);
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+
+    if (!token) return json(401, { message: 'Not authenticated.' });
+
+    const { data: userRes, error: userErr } = await adminClient.auth.getUser(token);
+    if (userErr || !userRes?.user) return json(401, { message: 'Invalid or expired token.' });
+
+    const callerId = userRes.user.id;
+    const { data: prof } = await adminClient
+      .from('profiles')
+      .select('role')
+      .eq('id', callerId)
+      .maybeSingle();
     if (prof?.role !== 'admin') return json(403, { message: 'Only admins can create accounts.' });
 
     const b = await req.json();
-    const cnicDigits = String(b.cnic ?? '').replace(/\D/g, '');
-    if (cnicDigits.length !== 13) return json(400, { message: 'CNIC must be 13 digits.' });
 
-    const admin = createClient(url, service);
-    const { data: created, error } = await admin.auth.admin.createUser({
-      email: `${cnicDigits}@hayaat.id`,
+    // Build the auth email alias.
+    const cnicRaw = String(b.cnic ?? '');
+    const cnicDigits = cnicRaw.replace(/\D/g, '');
+    const validCnic = cnicDigits.length === 13 ? cnicDigits : null;
+
+    let authEmail: string = String(b.email ?? '').trim();
+    if (!authEmail) {
+      if (b.role === 'receptionist' && b.employee_id) {
+        authEmail = `${String(b.employee_id).toLowerCase().trim()}@hayaat.id`;
+      } else if (validCnic) {
+        authEmail = `${validCnic}@hayaat.id`;
+      } else {
+        return json(400, {
+          message: 'Must provide either a 13-digit CNIC, an email, or (for receptionists) an employee_id.',
+        });
+      }
+    }
+
+    const { data: created, error } = await adminClient.auth.admin.createUser({
+      email: authEmail,
       password: b.password,
       email_confirm: true,
       // app_metadata is service-role-only → the handle_new_user trigger trusts
@@ -49,13 +73,14 @@ Deno.serve(async (req) => {
       app_metadata: { role: b.role },
       user_metadata: {
         role: b.role,
-        cnic: cnicDigits,
+        cnic: validCnic,
         full_name: b.full_name,
         phone: b.phone_primary,
         email: b.email,
         clinic_id: b.clinic_id,
         lab_id: b.lab_id,
         admin_level: b.admin_level,
+        employee_id: b.employee_id,
       },
     });
     if (error) return json(400, { message: error.message });

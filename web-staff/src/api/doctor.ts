@@ -41,9 +41,9 @@ export const doctorApi = {
     if (error) throw new Error(error.message);
   },
 
-  async searchPatient(cnic: string): Promise<PatientSummary> {
-    const prof = await one<Q>(supabase.from('profiles').select('*').eq('cnic', cnic).eq('role', 'patient').maybeSingle());
-    if (!prof) throw new Error('No patient found with that CNIC.');
+  async searchPatient(cardNumber: string): Promise<PatientSummary> {
+    const prof = await one<Q>(supabase.from('profiles').select('*').eq('card_number', cardNumber).eq('role', 'patient').maybeSingle());
+    if (!prof) throw new Error('No patient found with that Card Number.');
     const id = prof.id as string;
     const pp = await one<Q>(supabase.from('patient_profiles').select('*').eq('id', id).maybeSingle());
     const allergies = await rows<Record<string, unknown>>(supabase.from('allergies').select('*').eq('patient_id', id));

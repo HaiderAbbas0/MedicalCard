@@ -56,7 +56,7 @@ begin
   elsif r = 'lab_worker' then
     insert into public.lab_worker_profiles (id, lab_id) values (new.id, nullif(m->>'lab_id','')::uuid);
   elsif r = 'receptionist' then
-    insert into public.receptionist_profiles (id, clinic_id) values (new.id, nullif(m->>'clinic_id','')::uuid);
+    insert into public.receptionist_profiles (id, clinic_id, employee_id) values (new.id, nullif(m->>'clinic_id','')::uuid, m->>'employee_id');
   elsif r = 'admin' then
     insert into public.admin_profiles (id, admin_level) values (new.id, coalesce(m->>'admin_level','support_admin'));
   end if;

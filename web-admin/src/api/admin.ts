@@ -119,9 +119,14 @@ export const adminApi = {
   clinics(): Promise<Clinic[]> {
     return rows<Clinic>(supabase.from('clinics').select('*').order('name'));
   },
-  async createClinic(body: Record<string, unknown>): Promise<void> {
-    const { error } = await supabase.from('clinics').insert({ ...body, status: 'active' });
+  async createClinic(body: Record<string, unknown>): Promise<{ id: string }> {
+    const { data, error } = await supabase
+      .from('clinics')
+      .insert({ ...body, status: 'active' })
+      .select('id')
+      .single();
     if (error) throw new Error(error.message);
+    return data as { id: string };
   },
   labs(): Promise<Lab[]> {
     return rows<Lab>(supabase.from('diagnostic_labs').select('*').order('name'));
@@ -209,7 +214,21 @@ export const adminApi = {
 
   /** Create a staff/admin account via the admin-create-user Edge Function. */
   async createStaff(role: string, body: Record<string, unknown>): Promise<void> {
-    const { error } = await supabase.functions.invoke('admin-create-user', { body: { role, ...body } });
-    if (error) throw new Error(error.message || 'Account creation needs the admin-create-user Edge Function (see supabase/functions).');
+    // Use raw fetch instead of supabase.functions.invoke to get real error messages.
+    const { data: session } = await supabase.auth.getSession();
+    const token = session?.session?.access_token;
+    if (!token) throw new Error('You must be logged in as an admin to create accounts.');
+
+    const url = `${import.meta.env.VITE_SUPABASE_URL ?? 'https://iikwdtiqvxxatrzahuzo.supabase.co'}/functions/v1/admin-create-user`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ role, ...body }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.message ?? `Edge Function error: ${res.status}`);
   },
 };
