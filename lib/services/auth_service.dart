@@ -95,7 +95,7 @@ class AuthService {
         },
       );
     } on AuthException catch (e) {
-      throw BadRequestException(_friendly(e.message));
+      throw BadRequestException(_friendly(e.message, isPhone: true));
     }
 
     if (db.auth.currentSession == null) {
@@ -146,7 +146,7 @@ class AuthService {
         },
       );
     } on AuthException catch (e) {
-      throw BadRequestException(_friendly(e.message));
+      throw BadRequestException(_friendly(e.message, isPhone: true));
     }
     // Doctors cannot use the app until an admin approves them.
     await db.auth.signOut();
@@ -180,11 +180,13 @@ class AuthService {
     return profile ?? {'id': uid, 'role': 'patient', 'full_name': '', 'extended': {}};
   }
 
-  String _friendly(String raw) {
+  String _friendly(String raw, {bool isPhone = false}) {
     final m = raw.toLowerCase();
     if (m.contains('invalid login')) return 'Invalid CNIC or password.';
     if (m.contains('already registered') || m.contains('already exists')) {
-      return 'An account with this CNIC already exists.';
+      return isPhone
+          ? 'An account with this phone number already exists.'
+          : 'An account with this CNIC already exists.';
     }
     return raw;
   }

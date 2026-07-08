@@ -72,13 +72,9 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   bool get _enabled {
-    final phoneDigits = _phone.text.replaceAll(RegExp(r'\D'), '');
-    final phoneOk = phoneDigits.length == 11;
-    final emailOk = _validateEmail(_email.text) == null;
     return _name.text.trim().isNotEmpty &&
-        phoneOk &&
-        emailOk &&
-        _validatePassword(_pw.text) == null &&
+        _phone.text.trim().isNotEmpty &&
+        _pw.text.isNotEmpty &&
         _dob != null &&
         _consent;
   }
