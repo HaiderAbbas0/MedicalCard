@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/auth_controller.dart';
-import '../../data/mock_data.dart';
+import '../../data/mock_data.dart' show UserPatientExtension;
 import '../../models/auth_model.dart';
 import '../../services/patient_service.dart';
 import '../../theme/app_colors.dart';
@@ -32,8 +32,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final ext = user?.extended ?? const {};
     _nameCtrl = TextEditingController(text: user?.name ?? '');
     _phoneCtrl = TextEditingController(text: user?.phone ?? '');
-    _emergencyCtrl = TextEditingController(text: (ext['emergency_contact_name'] ?? '').toString());
-    _emergencyPhoneCtrl = TextEditingController(text: (ext['emergency_contact_phone'] ?? '').toString());
+    _emergencyCtrl = TextEditingController(
+      text: (ext['emergency_contact_name'] ?? '').toString(),
+    );
+    _emergencyPhoneCtrl = TextEditingController(
+      text: (ext['emergency_contact_phone'] ?? '').toString(),
+    );
   }
 
   @override
@@ -67,7 +71,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       setState(() => _busy = false);
       messenger
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Update failed: $e'), backgroundColor: Colors.red[800]));
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Update failed: $e'),
+            backgroundColor: Colors.red[800],
+          ),
+        );
     }
   }
 
@@ -75,7 +84,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     final c = context.c;
     final auth = context.watch<AuthController>();
-    final p = auth.currentUser?.toPatient() ?? mockPatient;
+    final p = auth.currentUser?.toPatient();
+    if (p == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            'Your patient profile could not be loaded. Please sign in again.',
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -100,14 +118,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: c.border),
                           ),
-                          child: Icon(Icons.chevron_left_rounded,
-                              size: 24, color: c.text),
+                          child: Icon(
+                            Icons.chevron_left_rounded,
+                            size: 24,
+                            color: c.text,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Text('Edit profile',
-                          style: AppText.display
-                              .copyWith(fontSize: 22, color: c.text)),
+                      Text(
+                        'Edit profile',
+                        style: AppText.display.copyWith(
+                          fontSize: 22,
+                          color: c.text,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -123,9 +148,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             gradient: brandGradient(context),
                             shape: BoxShape.circle,
                           ),
-                          child: Text(p.initials,
-                              style: AppText.display.copyWith(
-                                  fontSize: 30, color: Colors.white)),
+                          child: Text(
+                            p.initials,
+                            style: AppText.display.copyWith(
+                              fontSize: 30,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                         Positioned(
                           right: -2,
@@ -139,8 +168,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               shape: BoxShape.circle,
                               border: Border.all(color: c.border),
                             ),
-                            child: Icon(Icons.edit_rounded,
-                                size: 14, color: c.primary),
+                            child: Icon(
+                              Icons.edit_rounded,
+                              size: 14,
+                              color: c.primary,
+                            ),
                           ),
                         ),
                       ],
@@ -160,12 +192,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     children: [
                       Expanded(
                         child: _ReadOnlyField(
-                            label: 'Blood group', value: p.blood),
+                          label: 'Blood group',
+                          value: p.blood,
+                        ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: _Field(
-                            label: 'Emergency name', controller: _emergencyCtrl),
+                          label: 'Emergency name',
+                          controller: _emergencyCtrl,
+                        ),
                       ),
                     ],
                   ),
@@ -210,9 +246,13 @@ class _Field extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: AppText.caption.copyWith(
-                fontWeight: FontWeight.w700, color: c.text2)),
+        Text(
+          label,
+          style: AppText.caption.copyWith(
+            fontWeight: FontWeight.w700,
+            color: c.text2,
+          ),
+        ),
         const SizedBox(height: 8),
         SizedBox(
           height: 52,
@@ -225,8 +265,10 @@ class _Field extends StatelessWidget {
               filled: true,
               fillColor: c.surface,
               isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 14,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide(color: c.border),
@@ -259,9 +301,13 @@ class _ReadOnlyField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: AppText.caption.copyWith(
-                fontWeight: FontWeight.w700, color: c.text2)),
+        Text(
+          label,
+          style: AppText.caption.copyWith(
+            fontWeight: FontWeight.w700,
+            color: c.text2,
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           height: 52,
@@ -272,9 +318,13 @@ class _ReadOnlyField extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: c.border),
           ),
-          child: Text(value,
-              style: AppText.body.copyWith(
-                  fontWeight: FontWeight.w700, color: c.text)),
+          child: Text(
+            value,
+            style: AppText.body.copyWith(
+              fontWeight: FontWeight.w700,
+              color: c.text,
+            ),
+          ),
         ),
       ],
     );

@@ -12,6 +12,7 @@ export default function PatientRecordPage() {
   const [meds, setMeds] = useState<Record<string, unknown>[]>([]);
   const [error, setError] = useState('');
   const [showAllergy, setShowAllergy] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
 
   const load = useCallback(() => {
     Promise.all([doctorApi.patient(id), doctorApi.timeline(id), doctorApi.medications(id)])
@@ -36,6 +37,7 @@ export default function PatientRecordPage() {
         <button className="btn btn-ghost" onClick={() => navigate('/doctor/patients')}>← Back to search</button>
         <div className="row">
           <button className="btn btn-ghost" onClick={() => setShowAllergy(true)}>Record allergy</button>
+          <button className="btn btn-ghost" onClick={() => setShowUpload(true)}>Upload document</button>
           <button className="btn btn-primary" onClick={() => navigate(`/doctor/patient/${id}/encounter`)}>+ New encounter</button>
         </div>
       </div>
@@ -43,7 +45,7 @@ export default function PatientRecordPage() {
       <div className="card card-pad">
         <h2 style={{ margin: 0 }}>{patient.full_name}</h2>
         <p className="muted" style={{ marginTop: 4 }}>
-          CNIC {patient.cnic} · {patient.gender ?? '—'} · DOB {patient.date_of_birth ?? '—'} · Blood {patient.blood_group ?? '—'}
+          Hayaat ID {patient.card_number?.replace(/(\d{4})(?=\d)/g, '$1 ')} · {patient.gender ?? '—'} · DOB {patient.date_of_birth ?? '—'} · Blood {patient.blood_group ?? '—'}
         </p>
         {allergies.length > 0 && (
           <div style={{ background: 'var(--red-bg)', color: 'var(--red)', padding: '10px 14px', borderRadius: 8, marginTop: 10 }}>
@@ -105,7 +107,116 @@ export default function PatientRecordPage() {
       {showAllergy && (
         <RecordAllergyModal patientId={id} onClose={() => setShowAllergy(false)} onSaved={() => { setShowAllergy(false); load(); }} />
       )}
+      {showUpload && (
+        <UploadDocumentModal patientId={id} onClose={() => setShowUpload(false)} onSaved={() => { setShowUpload(false); load(); }} />
+      )}
     </>
+  );
+}
+
+const SPECIALTIES = [
+  'General Medicine', 'Neurology', 'Ophthalmology', 'ENT', 'Dentistry', 'Dermatology',
+  'Cardiology', 'Pulmonology', 'Gastroenterology', 'Hepatology', 'Nephrology',
+  'Urology', 'Gynecology', 'Obstetrics', 'Endocrinology', 'Orthopedics',
+  'Rheumatology', 'Oncology', 'Hematology', 'Allergy & Immunology',
+  'Infectious Diseases', 'Psychiatry', 'Psychology', 'Pediatrics',
+  'Pathology', 'Radiology', 'Emergency Medicine', 'Physiotherapy',
+];
+
+const RECORD_TYPES = [
+  ['prescription', 'Doctor prescription'],
+  ['laboratory', 'Laboratory test report'],
+  ['imaging', 'Imaging report'],
+  ['medical_certificate', 'Medical certificate'],
+  ['discharge_summary', 'Discharge summary'],
+  ['procedure_note', 'Operation / procedure note'],
+  ['vaccination', 'Vaccination record'],
+  ['referral', 'Referral letter'],
+  ['consultation', 'Consultation note'],
+  ['clinical_note', 'Clinical note'],
+  ['vital_signs', 'Vital signs'],
+  ['diagnosis', 'Diagnosis'],
+  ['medication_history', 'Medication history'],
+  ['allergy', 'Allergy record'],
+  ['chronic_disease', 'Chronic disease record'],
+  ['follow_up', 'Follow-up note'],
+  ['other', 'Other document'],
+] as const;
+
+function UploadDocumentModal({ patientId, onClose, onSaved }: { patientId: string; onClose: () => void; onSaved: () => void }) {
+  const [title, setTitle] = useState('');
+  const [specialty, setSpecialty] = useState('General Medicine');
+  const [recordType, setRecordType] = useState('other');
+  const [recordDate, setRecordDate] = useState(new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [progress, setProgress] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function save() {
+    if (!title.trim()) return setError('Title is required.');
+    if (!files.length) return setError('Choose at least one file to upload.');
+    setBusy(true);
+    setProgress('Starting upload...');
+    setError('');
+    try {
+      await doctorApi.uploadMedicalDocument(patientId, {
+        title: title.trim(),
+        specialty,
+        record_type: recordType,
+        record_date: recordDate,
+        notes: notes.trim() || undefined,
+        files,
+        onProgress: (uploaded, total, currentFile) => setProgress(`Uploaded ${uploaded}/${total}: ${currentFile}`),
+      });
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      title="Upload medical document"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? 'Uploading...' : 'Upload'}</button>
+        </>
+      }
+    >
+      <div className="field"><label>Title *</label>
+        <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="MRI Brain Report" /></div>
+      <div className="field"><label>Specialty</label>
+        <select className="select" value={specialty} onChange={(e) => setSpecialty(e.target.value)}>
+          {SPECIALTIES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+      <div className="field"><label>Record type</label>
+        <select className="select" value={recordType} onChange={(e) => setRecordType(e.target.value)}>
+          {RECORD_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      </div>
+      <div className="field"><label>Date</label>
+        <input className="input" type="date" value={recordDate} onChange={(e) => setRecordDate(e.target.value)} /></div>
+      <div className="field"><label>Original files * (PDF / image / DICOM, max 25 MB each)</label>
+        <input className="input" type="file" multiple accept="application/pdf,image/*,.dcm" onChange={(e) => setFiles(Array.from(e.target.files ?? []))} />
+        {files.length > 0 && (
+          <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+            {files.length} file{files.length === 1 ? '' : 's'} selected: {files.map((f) => f.name).join(', ')}
+          </div>
+        )}
+      </div>
+      <div className="field"><label>Notes</label>
+        <textarea className="input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+      {progress && <div className="muted" style={{ fontSize: 12 }}>{progress}</div>}
+      {error && <div className="error-text">{error}</div>}
+      {error && <p className="muted" style={{ fontSize: 12 }}>Fix the issue and click Upload again to retry.</p>}
+    </Modal>
   );
 }
 

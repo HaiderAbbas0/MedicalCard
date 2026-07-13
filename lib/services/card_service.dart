@@ -20,7 +20,7 @@ class CardService {
     final uid = currentUid;
     if (uid == null) return null;
     final row = await db.from('cards').select().eq('profile_id', uid).maybeSingle();
-    return row == null ? null : CardModel.fromJson(row);
+    return row == null ? null : CardModel.fromJson(await _withSignedPhoto(row));
   }
 
   /// Issue (or update) the card. The name is entered in English; the Urdu
@@ -42,7 +42,7 @@ class CardService {
       'p_photo_url': photoUrl,
     });
     final map = row is List ? row.first : row;
-    return CardModel.fromJson(Map<String, dynamic>.from(map));
+    return CardModel.fromJson(await _withSignedPhoto(Map<String, dynamic>.from(map)));
   }
 
   /// Update only the card photo (keeps profile + card pictures in sync).
@@ -86,7 +86,7 @@ class CardService {
   }
 
   /// Upload a card photo (background removed if a remove.bg key is configured),
-  /// returning its public URL.
+  /// returning the private object path stored on the card row.
   Future<String> uploadPhoto(Uint8List bytes) async {
     final processed = await _maybeRemoveBackground(bytes);
     final uid = currentUid;
@@ -96,7 +96,19 @@ class CardService {
           processed,
           fileOptions: const FileOptions(contentType: 'image/png', upsert: true),
         );
-    return db.storage.from('card-photos').getPublicUrl(path);
+    return path;
+  }
+
+  Future<Map<String, dynamic>> _withSignedPhoto(Map<String, dynamic> row) async {
+    final copy = Map<String, dynamic>.from(row);
+    final value = (copy['photo_url'] ?? '').toString();
+    if (value.isEmpty || value.startsWith('http')) return copy;
+    try {
+      copy['photo_url'] = await db.storage.from('card-photos').createSignedUrl(value, 3600);
+    } catch (_) {
+      copy['photo_url'] = null;
+    }
+    return copy;
   }
 
   Future<Uint8List> _maybeRemoveBackground(Uint8List bytes) async {

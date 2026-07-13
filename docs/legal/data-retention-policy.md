@@ -10,7 +10,7 @@
 
 | Data | Retention | Rationale |
 | --- | --- | --- |
-| Account & profile (CNIC, name, contact, DOB) | While the account is active | Needed to provide the service |
+| Account & profile (Hayaat ID, name, contact, DOB) | While the account is active | Needed to provide the service |
 | Clinical records (encounters, prescriptions, observations, allergies, lab orders/results) | For the period required for continuity of care and by law *(confirm term, e.g. 5–10 years)* | Continuity of care; legal record |
 | Card photo | While the card is active | Identification |
 | Messages | While the account is active | Care communication history |

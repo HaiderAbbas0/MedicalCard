@@ -1,6 +1,6 @@
-# CNIC Health Card — Admin Web Portal
+# HayaatID — Admin Web Portal
 
-React + TypeScript (Vite) web portal for **system administrators** of the CNIC
+React + TypeScript (Vite) web portal for **system administrators** of the HayaatID
 Health Card System.
 
 The platform has two web apps:
@@ -34,7 +34,6 @@ npm run dev             # http://localhost:5173
 If `.env` is omitted, it falls back to the shared dev/demo project baked into
 `src/api/supabase.ts`.
 
-**Demo admin:** CNIC `3520100000001` · password `password123`.
 
 ## Structure
 

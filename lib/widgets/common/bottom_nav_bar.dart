@@ -5,17 +5,24 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 
 /// Scaffold that hosts the persistent floating bottom navigation bar.
-/// Tabs: Home · History · Rx · Reports · Profile.
+/// Tabs: Home · Records · Rx · Reports · Profile.
 class ScaffoldWithNav extends StatelessWidget {
   final StatefulNavigationShell shell;
   const ScaffoldWithNav({super.key, required this.shell});
 
   static const _items = [
     _NavItem(Icons.home_rounded, Icons.home_outlined, 'nav.home'),
-    _NavItem(Icons.access_time_filled_rounded, Icons.access_time_rounded,
-        'nav.history'),
+    _NavItem(
+      Icons.folder_special_rounded,
+      Icons.folder_outlined,
+      'nav.history',
+    ),
     _NavItem(Icons.medication_rounded, Icons.medication_outlined, 'nav.rx'),
-    _NavItem(Icons.description_rounded, Icons.description_outlined, 'nav.reports'),
+    _NavItem(
+      Icons.description_rounded,
+      Icons.description_outlined,
+      'nav.reports',
+    ),
     _NavItem(Icons.person_rounded, Icons.person_outline_rounded, 'nav.profile'),
   ];
 
@@ -35,8 +42,9 @@ class ScaffoldWithNav extends StatelessWidget {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           boxShadow: [
             BoxShadow(
-              color:
-                  Colors.black.withValues(alpha: context.isDark ? 0.4 : 0.08),
+              color: Colors.black.withValues(
+                alpha: context.isDark ? 0.4 : 0.08,
+              ),
               blurRadius: 24,
               offset: const Offset(0, -6),
             ),
@@ -88,8 +96,11 @@ class _NavButton extends StatelessWidget {
     final c = context.c;
     final label = context.tr(item.label);
 
-    Widget icon = Icon(selected ? item.active : item.inactive,
-        size: 25, color: selected ? c.primary : c.text3);
+    Widget icon = Icon(
+      selected ? item.active : item.inactive,
+      size: 25,
+      color: selected ? c.primary : c.text3,
+    );
     if (selected) {
       icon = ShaderMask(
         shaderCallback: (r) => brandGradient(context).createShader(r),

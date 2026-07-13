@@ -34,7 +34,7 @@ export default function CreateAccountModal({
   const [role, setRole] = useState<StaffRole>('receptionist');
   const [form, setForm] = useState({
     full_name: '',
-    cnic: '',
+    employee_id: '',
     phone_primary: '',
     email: '',
     password: '',
@@ -58,15 +58,15 @@ export default function CreateAccountModal({
 
   async function submit() {
     setError('');
-    if (form.cnic.trim().length !== 13) return setError('CNIC must be exactly 13 digits.');
     if (!form.full_name.trim() || !form.password) return setError('Full name and password are required.');
+    if (!form.email.trim() && !form.employee_id.trim()) return setError('Email or Employee ID is required.');
     const pwErr = passwordPolicyError(form.password);
     if (pwErr) return setError(pwErr);
     if (role === 'receptionist' && !form.clinic_id) return setError('Select a clinic for the receptionist.');
     if (role === 'lab_worker' && !form.lab_id) return setError('Select a lab for the lab worker.');
 
     const body: Record<string, string> = {
-      cnic: form.cnic.trim(),
+      employee_id: form.employee_id.trim(),
       full_name: form.full_name.trim(),
       phone_primary: form.phone_primary.trim(),
       email: form.email.trim(),
@@ -123,13 +123,8 @@ export default function CreateAccountModal({
         <input className="input" value={form.full_name} onChange={(e) => set('full_name', e.target.value)} />
       </div>
       <div className="field">
-        <label>CNIC * (13 digits)</label>
-        <input
-          className="input"
-          value={form.cnic}
-          maxLength={13}
-          onChange={(e) => set('cnic', e.target.value.replace(/\D/g, ''))}
-        />
+        <label>Employee ID</label>
+        <input className="input" value={form.employee_id} onChange={(e) => set('employee_id', e.target.value)} />
       </div>
       <div className="row">
         <div className="field" style={{ flex: 1 }}>

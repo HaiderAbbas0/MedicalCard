@@ -11,13 +11,9 @@ export default function PatientLookupPage() {
   async function search(e: FormEvent) {
     e.preventDefault();
     setError('');
-    const query = cardNumber.trim().toUpperCase();
-    if (!query.startsWith('HAY-PAT-')) {
-      setError('Card number must start with HAY-PAT-.');
-      return;
-    }
-    if (query.length < 9) {
-      setError('Enter a valid Card Number (e.g. HAY-PAT-0004).');
+    const query = cardNumber.replace(/\s/g, '');
+    if (!/^\d{16}$/.test(query)) {
+      setError('Enter a valid 16-digit Hayaat ID.');
       return;
     }
     setBusy(true);
@@ -33,13 +29,13 @@ export default function PatientLookupPage() {
 
   return (
     <div className="card card-pad" style={{ maxWidth: 520 }}>
-      <p className="section-title">Find a patient by Card Number</p>
+      <p className="section-title">Find a patient by Hayaat ID</p>
       <p className="muted" style={{ marginTop: 0 }}>
-        Looking up a patient records an access entry in the audit log (Scope §12.2).
+        Every patient lookup is securely recorded in the access audit log.
       </p>
       <form onSubmit={search} className="row" style={{ marginTop: 16 }}>
-        <input className="input" placeholder="Card Number (e.g. HAY-PAT-0004)" value={cardNumber}
-          onChange={(e) => setCardNumber(e.target.value)} autoFocus />
+        <input className="input" inputMode="numeric" maxLength={19} placeholder="0000 0000 0000 0000" value={cardNumber}
+          onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim())} autoFocus />
         <button className="btn btn-primary" disabled={busy}>{busy ? 'Searching…' : 'Search'}</button>
       </form>
       {error && <div className="error-text">{error}</div>}

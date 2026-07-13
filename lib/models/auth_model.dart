@@ -1,4 +1,4 @@
-/// User roles in the CNIC Health Card System.
+/// User roles in the HayaatID Health Platform.
 enum UserRole { patient, doctor, labWorker, receptionist, admin, unknown }
 
 UserRole roleFromString(String? value) {
@@ -40,8 +40,7 @@ class UserModel {
   final String name;
   final String email;
   final String? phone;
-  final String? cnic;
-  final String? cardNumber; // HAY-PAT-#### — the Unique ID
+  final String? cardNumber; // 16-digit Hayaat ID
   final UserRole role;
   final String? status;
   final String? healthId;
@@ -57,7 +56,6 @@ class UserModel {
     required this.name,
     required this.email,
     this.phone,
-    this.cnic,
     this.cardNumber,
     this.role = UserRole.patient,
     this.status,
@@ -77,7 +75,6 @@ class UserModel {
       name: (json['full_name'] ?? json['name'] ?? '') as String,
       email: (json['email'] ?? '') as String,
       phone: (json['phone_primary'] ?? json['phone']) as String?,
-      cnic: json['cnic'] as String?,
       cardNumber: json['card_number'] as String?,
       role: roleFromString(json['role'] as String?),
       status: json['status'] as String?,
@@ -90,20 +87,19 @@ class UserModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'full_name': name,
-        'email': email,
-        'phone_primary': phone,
-        'cnic': cnic,
-        'card_number': cardNumber,
-        'role': roleToString(role),
-        'status': status,
-        'healthId': healthId,
-        'date_of_birth': dob,
-        'gender': gender,
-        'bloodGroup': bloodGroup,
-        'extended': extended,
-      };
+    'id': id,
+    'full_name': name,
+    'email': email,
+    'phone_primary': phone,
+    'card_number': cardNumber,
+    'role': roleToString(role),
+    'status': status,
+    'healthId': healthId,
+    'date_of_birth': dob,
+    'gender': gender,
+    'bloodGroup': bloodGroup,
+    'extended': extended,
+  };
 }
 
 class AuthResponse {

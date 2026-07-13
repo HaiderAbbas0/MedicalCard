@@ -45,20 +45,14 @@ Deno.serve(async (req) => {
 
     const b = await req.json();
 
-    // Build the auth email alias.
-    const cnicRaw = String(b.cnic ?? '');
-    const cnicDigits = cnicRaw.replace(/\D/g, '');
-    const validCnic = cnicDigits.length === 13 ? cnicDigits : null;
-
+    // Use a real email when supplied, otherwise a staff Employee ID alias.
     let authEmail: string = String(b.email ?? '').trim();
     if (!authEmail) {
-      if (b.role === 'receptionist' && b.employee_id) {
+      if (b.employee_id) {
         authEmail = `${String(b.employee_id).toLowerCase().trim()}@hayaat.id`;
-      } else if (validCnic) {
-        authEmail = `${validCnic}@hayaat.id`;
       } else {
         return json(400, {
-          message: 'Must provide either a 13-digit CNIC, an email, or (for receptionists) an employee_id.',
+          message: 'Must provide an email or Employee ID.',
         });
       }
     }
@@ -73,7 +67,6 @@ Deno.serve(async (req) => {
       app_metadata: { role: b.role },
       user_metadata: {
         role: b.role,
-        cnic: validCnic,
         full_name: b.full_name,
         phone: b.phone_primary,
         email: b.email,

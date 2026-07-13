@@ -1,8 +1,8 @@
 {
-  "name": "cnic-health-card-admin",
+  "name": "hayaat-id-admin",
   "private": true,
   "version": "1.0.0",
-  "description": "Web admin portal for the CNIC Health Card System (React + TypeScript).",
+  "description": "Web admin portal for the Hayaat ID health platform (React + TypeScript).",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -40,8 +40,8 @@ declare
   m jsonb := new.raw_user_meta_data;
   cnum text := public.gen_card_number(coalesce(new.raw_user_meta_data->>'role','patient'));
 begin
-  insert into public.profiles (id, auth_user_id, cnic, full_name, date_of_birth, gender, phone_primary, email, role, status, card_number)
-  values (new.id, new.id, m->>'cnic', coalesce(m->>'full_name',''), nullif(m->>'date_of_birth','')::date,
+  insert into public.profiles (id, auth_user_id, full_name, date_of_birth, gender, phone_primary, email, role, status, card_number)
+  values (new.id, new.id, coalesce(m->>'full_name',''), nullif(m->>'date_of_birth','')::date,
           m->>'gender', coalesce(m->>'phone',''), nullif(m->>'email',''), r,
           case when r='doctor' then 'pending' else 'active' end, cnum);
 
@@ -71,18 +71,22 @@ do $$ declare rec record; begin
   end loop;
 end $$;
 
--- ── Login by Unique ID: map a card number / CNIC / phone → auth email ───────
+-- ── Login by Hayaat ID / phone / email → auth email ─────────────────────────
 create or replace function public.login_email(p_id text)
   returns text language sql security definer set search_path = public as
 $$
   select u.email from auth.users u
   join public.profiles p on p.id = u.id
-  where p.card_number = p_id or p.cnic = p_id or p.phone_primary = p_id
+  where p.card_number = regexp_replace(p_id, '\s', '', 'g')
+     or p.phone_primary = regexp_replace(p_id, '\D', '', 'g')
+     or lower(p.email) = lower(trim(p_id))
   limit 1
 $$;
 grant execute on function public.login_email(text) to anon, authenticated;
 
 -- ── Card request now accepts an English "Name on Card" (+ auto Urdu) ────────
+drop function if exists public.request_card(text, date, text, text, text);
+drop function if exists public.request_card(text, text, date, text, text, text);
 create or replace function public.request_card(
   p_name_en text, p_name_ur text, p_dob date, p_blood_group text, p_city text, p_photo_url text)
   returns public.cards language plpgsql security definer set search_path = public as

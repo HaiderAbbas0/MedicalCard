@@ -12,6 +12,7 @@ class RecordController extends ChangeNotifier {
   List<VisitModel> _visits = [];
   List<PrescriptionModel> _prescriptions = [];
   List<ReportModel> _reports = [];
+  List<MedicalRecordModel> _medicalRecords = [];
   List<Map<String, dynamic>> _allergies = [];
   List<AppointmentModel> _appointments = [];
 
@@ -25,13 +26,15 @@ class RecordController extends ChangeNotifier {
   List<VisitModel> get visits => _visits;
   List<PrescriptionModel> get prescriptions => _prescriptions;
   List<ReportModel> get reports => _reports;
+  List<MedicalRecordModel> get medicalRecords => _medicalRecords;
   List<Map<String, dynamic>> get allergies => _allergies;
   List<AppointmentModel> get appointments => _appointments;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
   // ── Derived dashboard stats ─────────────────────────────────────────────────
-  List<PrescriptionModel> get activePrescriptions => _prescriptions.where((p) => p.active).toList();
+  List<PrescriptionModel> get activePrescriptions =>
+      _prescriptions.where((p) => p.active).toList();
   int get activeMedsCount => activePrescriptions.length;
   int get allergyCount => _allergies.length;
   int get recentVisitsCount => _visits.length;
@@ -39,18 +42,24 @@ class RecordController extends ChangeNotifier {
   /// Earliest upcoming appointment (today or later, not cancelled/no-show).
   AppointmentModel? get nextAppointment {
     final today = DateTime.now().toIso8601String().substring(0, 10);
-    final upcoming = _appointments
-        .where((a) =>
-            a.date.compareTo(today) >= 0 &&
-            !a.status.startsWith('cancelled') &&
-            a.status != 'no_show' &&
-            a.status != 'completed')
-        .toList()
-      ..sort((a, b) => ('${a.date} ${a.time}').compareTo('${b.date} ${b.time}'));
+    final upcoming =
+        _appointments
+            .where(
+              (a) =>
+                  a.date.compareTo(today) >= 0 &&
+                  !a.status.startsWith('cancelled') &&
+                  a.status != 'no_show' &&
+                  a.status != 'completed',
+            )
+            .toList()
+          ..sort(
+            (a, b) => ('${a.date} ${a.time}').compareTo('${b.date} ${b.time}'),
+          );
     return upcoming.isNotEmpty ? upcoming.first : null;
   }
 
-  RecordController({RecordService? service}) : _service = service ?? RecordService();
+  RecordController({RecordService? service})
+    : _service = service ?? RecordService();
 
   /// Re-loads using the last token (for pull-to-refresh / retry).
   Future<void> refresh() => loadRecords(_token ?? '');
@@ -68,6 +77,9 @@ class RecordController extends ChangeNotifier {
         _service.fetchVisits(token),
         _service.fetchPrescriptions(token),
         _service.fetchReports(token),
+        _service
+            .fetchMedicalRecords(token)
+            .catchError((_) => <MedicalRecordModel>[]),
         patientApi.myAllergies().catchError((_) => <Map<String, dynamic>>[]),
         patientApi.myAppointments().catchError((_) => <AppointmentModel>[]),
       ]);
@@ -75,8 +87,9 @@ class RecordController extends ChangeNotifier {
       _visits = results[0] as List<VisitModel>;
       _prescriptions = results[1] as List<PrescriptionModel>;
       _reports = results[2] as List<ReportModel>;
-      _allergies = results[3] as List<Map<String, dynamic>>;
-      _appointments = results[4] as List<AppointmentModel>;
+      _medicalRecords = results[3] as List<MedicalRecordModel>;
+      _allergies = results[4] as List<Map<String, dynamic>>;
+      _appointments = results[5] as List<AppointmentModel>;
     } catch (e) {
       _errorMessage = 'Failed to load medical records: $e';
     } finally {
@@ -90,6 +103,7 @@ class RecordController extends ChangeNotifier {
     _visits = [];
     _prescriptions = [];
     _reports = [];
+    _medicalRecords = [];
     _allergies = [];
     _appointments = [];
     _loaded = false;

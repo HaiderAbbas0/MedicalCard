@@ -61,7 +61,7 @@ export default function DoctorApplicationsPage() {
           <thead>
             <tr>
               <th>Name</th>
-              <th>CNIC</th>
+              <th>Hayaat ID</th>
               <th>PMDC No.</th>
               <th>Specialization</th>
               <th>Clinic</th>
@@ -72,7 +72,7 @@ export default function DoctorApplicationsPage() {
             {apps.map((a) => (
               <tr key={a.id}>
                 <td>{a.full_name}</td>
-                <td className="mono">{a.cnic}</td>
+                <td className="mono">{a.card_number?.replace(/(\d{4})(?=\d)/g, '$1 ')}</td>
                 <td>{a.pmdc_number}</td>
                 <td>{a.specialization_primary}</td>
                 <td>{a.clinic?.name ?? '—'}</td>
@@ -103,7 +103,7 @@ export default function DoctorApplicationsPage() {
           }
         >
           <Detail label="Full name" value={selected.full_name} />
-          <Detail label="CNIC" value={selected.cnic} mono />
+          <Detail label="Hayaat ID" value={selected.card_number?.replace(/(\d{4})(?=\d)/g, '$1 ')} mono />
           <Detail label="Email" value={selected.email ?? '—'} />
           <Detail label="Phone" value={selected.phone_primary} />
           <Detail label="PMDC number" value={selected.pmdc_number} />

@@ -32,7 +32,7 @@ export default function LoginPage() {
         <p className="sub" style={{ textAlign: 'center' }}>Doctors · Lab · Reception</p>
 
         <div className="field">
-          <label>CNIC or Email</label>
+          <label>Hayaat ID, Employee ID, or Email</label>
           <input className="input" value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoFocus />
         </div>
         <div className="field">
@@ -50,7 +50,7 @@ export default function LoginPage() {
           <a href="/register-doctor">Are you a doctor? Register here →</a>
         </p>
         <p className="muted" style={{ fontSize: 12, marginTop: 8, textAlign: 'center' }}>
-          Demo (password123): doctor 3520199999991 · lab 3520177777771 · reception 3520166666661
+          Use your 16-digit Hayaat ID, employee ID, or approved email.
         </p>
         <p className="muted" style={{ fontSize: 12, marginTop: 8, textAlign: 'center' }}>
           <Link to="/legal/privacy">Privacy Policy</Link> · <Link to="/legal/terms">Terms of Service</Link>

@@ -23,10 +23,11 @@ class AuthController extends ChangeNotifier {
   bool get loggedIn => isAuthenticated;
   UserRole get role => _currentUser?.role ?? UserRole.patient;
 
-  AuthController({AuthService? authService}) : _authService = authService ?? AuthService();
+  AuthController({AuthService? authService})
+    : _authService = authService ?? AuthService();
 
   /// OTP check (signup creates the Supabase session; this step is a verification
-  /// gate). Demo code: 11111.
+  /// gate). The development verification code is configured separately.
   bool verifyOtp(String code) => code == '11111';
   Future<void> completeLogin() async {} // session already created on signup
   Future<void> signOut() => logout();
@@ -80,7 +81,6 @@ class AuthController extends ChangeNotifier {
     required String name,
     required String email,
     required String password,
-    String? cnic,
     String? phone,
     String? dob,
     String? gender,
@@ -94,7 +94,6 @@ class AuthController extends ChangeNotifier {
         name: name,
         email: email,
         password: password,
-        cnic: cnic,
         phone: phone,
         dob: dob,
         gender: gender,

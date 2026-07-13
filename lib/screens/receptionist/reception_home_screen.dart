@@ -34,7 +34,10 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
       await action();
       _reload();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -52,12 +55,18 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
     final c = context.c;
     return Scaffold(
       backgroundColor: c.bg,
-      appBar: const RoleAppBar(title: 'Reception', subtitle: "Today's clinic schedule"),
+      appBar: const RoleAppBar(
+        title: 'Reception',
+        subtitle: "Today's clinic schedule",
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _book,
         backgroundColor: c.primary,
         icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('New appointment', style: TextStyle(color: Colors.white)),
+        label: const Text(
+          'New appointment',
+          style: TextStyle(color: Colors.white),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async => _reload(),
@@ -68,18 +77,37 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snap.hasError) {
-              return ListView(children: [
-                const SizedBox(height: 120),
-                Center(child: Text('${snap.error}', style: TextStyle(color: c.danger))),
-                Center(child: TextButton(onPressed: _reload, child: const Text('Retry'))),
-              ]);
+              return ListView(
+                children: [
+                  const SizedBox(height: 120),
+                  Center(
+                    child: Text(
+                      '${snap.error}',
+                      style: TextStyle(color: c.danger),
+                    ),
+                  ),
+                  Center(
+                    child: TextButton(
+                      onPressed: _reload,
+                      child: const Text('Retry'),
+                    ),
+                  ),
+                ],
+              );
             }
             final appts = snap.data ?? [];
             if (appts.isEmpty) {
-              return ListView(children: [
-                const SizedBox(height: 140),
-                Center(child: Text('No appointments for this clinic.', style: TextStyle(color: c.text3))),
-              ]);
+              return ListView(
+                children: [
+                  const SizedBox(height: 140),
+                  Center(
+                    child: Text(
+                      'No appointments for this clinic.',
+                      style: TextStyle(color: c.text3),
+                    ),
+                  ),
+                ],
+              );
             }
             return ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
@@ -94,33 +122,69 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: c.border),
                   ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Expanded(child: Text(a.patientName, style: TextStyle(color: c.text, fontWeight: FontWeight.w700, fontSize: 16))),
-                      Text(a.time, style: TextStyle(color: c.text2, fontWeight: FontWeight.w600)),
-                    ]),
-                    const SizedBox(height: 4),
-                    Text('${a.doctorName ?? ''}  ·  ${a.status.replaceAll('_', ' ')}', style: TextStyle(color: c.text3, fontSize: 13)),
-                    const SizedBox(height: 10),
-                    Row(children: [
-                      if (a.status == 'confirmed' || a.status == 'pending')
-                        TextButton(
-                          onPressed: () => _act(() => _service.checkIn(a.id)),
-                          style: TextButton.styleFrom(
-                            backgroundColor: c.safe.withValues(alpha: 0.12),
-                            foregroundColor: c.safe,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              a.patientName,
+                              style: TextStyle(
+                                color: c.text,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
                           ),
-                          child: const Text('Check in', style: TextStyle(fontWeight: FontWeight.w700)),
-                        ),
-                      const SizedBox(width: 8),
-                      if (!a.status.startsWith('cancelled'))
-                        TextButton(
-                          onPressed: () => _act(() => _service.cancel(a.id, reason: 'Cancelled at reception')),
-                          style: TextButton.styleFrom(foregroundColor: c.danger),
-                          child: const Text('Cancel'),
-                        ),
-                    ]),
-                  ]),
+                          Text(
+                            a.time,
+                            style: TextStyle(
+                              color: c.text2,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${a.doctorName ?? ''}  ·  ${a.status.replaceAll('_', ' ')}',
+                        style: TextStyle(color: c.text3, fontSize: 13),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          if (a.status == 'confirmed' || a.status == 'pending')
+                            TextButton(
+                              onPressed: () =>
+                                  _act(() => _service.checkIn(a.id)),
+                              style: TextButton.styleFrom(
+                                backgroundColor: c.safe.withValues(alpha: 0.12),
+                                foregroundColor: c.safe,
+                              ),
+                              child: const Text(
+                                'Check in',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          const SizedBox(width: 8),
+                          if (!a.status.startsWith('cancelled'))
+                            TextButton(
+                              onPressed: () => _act(
+                                () => _service.cancel(
+                                  a.id,
+                                  reason: 'Cancelled at reception',
+                                ),
+                              ),
+                              style: TextButton.styleFrom(
+                                foregroundColor: c.danger,
+                              ),
+                              child: const Text('Cancel'),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 );
               },
             );
@@ -131,7 +195,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
   }
 }
 
-/// Bottom sheet: search patient by CNIC → pick doctor → date/time → book.
+/// Bottom sheet: search patient by Hayaat ID → pick doctor → date/time → book.
 class _BookingSheet extends StatefulWidget {
   final ReceptionistService service;
   const _BookingSheet({required this.service});
@@ -141,7 +205,7 @@ class _BookingSheet extends StatefulWidget {
 }
 
 class _BookingSheetState extends State<_BookingSheet> {
-  final _cnicCtrl = TextEditingController();
+  final _hayaatIdCtrl = TextEditingController();
   final _dateCtrl = TextEditingController();
   final _timeCtrl = TextEditingController();
   Map<String, dynamic>? _patient;
@@ -153,23 +217,34 @@ class _BookingSheetState extends State<_BookingSheet> {
   @override
   void initState() {
     super.initState();
-    widget.service.clinicDoctors().then((d) {
-      if (mounted) setState(() => _doctors = d);
-    }).catchError((_) {});
+    widget.service
+        .clinicDoctors()
+        .then((d) {
+          if (mounted) setState(() => _doctors = d);
+        })
+        .catchError((_) {});
   }
 
   @override
   void dispose() {
-    _cnicCtrl.dispose();
+    _hayaatIdCtrl.dispose();
     _dateCtrl.dispose();
     _timeCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _findPatient() async {
-    setState(() { _error = null; _busy = true; });
+    final digits = _hayaatIdCtrl.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 16) {
+      setState(() => _error = 'Enter a valid 16-digit Hayaat ID.');
+      return;
+    }
+    setState(() {
+      _error = null;
+      _busy = true;
+    });
     try {
-      final p = await widget.service.searchPatient(_cnicCtrl.text.trim());
+      final p = await widget.service.searchPatient(digits);
       setState(() => _patient = p);
     } catch (e) {
       setState(() => _error = e.toString());
@@ -179,11 +254,19 @@ class _BookingSheetState extends State<_BookingSheet> {
   }
 
   Future<void> _submit() async {
-    if (_patient == null || _doctorId == null || _dateCtrl.text.isEmpty || _timeCtrl.text.isEmpty) {
-      setState(() => _error = 'Find a patient and fill in doctor, date, and time.');
+    if (_patient == null ||
+        _doctorId == null ||
+        _dateCtrl.text.isEmpty ||
+        _timeCtrl.text.isEmpty) {
+      setState(
+        () => _error = 'Find a patient and fill in doctor, date, and time.',
+      );
       return;
     }
-    setState(() { _busy = true; _error = null; });
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
       await widget.service.bookAppointment(
         patientId: _patient!['id'].toString(),
@@ -193,7 +276,10 @@ class _BookingSheetState extends State<_BookingSheet> {
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      setState(() { _error = e.toString(); _busy = false; });
+      setState(() {
+        _error = e.toString();
+        _busy = false;
+      });
     }
   }
 
@@ -202,51 +288,106 @@ class _BookingSheetState extends State<_BookingSheet> {
     final c = context.c;
     return Padding(
       padding: EdgeInsets.only(
-        left: 20, right: 20, top: 20,
+        left: 20,
+        right: 20,
+        top: 20,
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
       ),
       child: SingleChildScrollView(
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('New appointment', style: TextStyle(color: c.text, fontWeight: FontWeight.w800, fontSize: 18)),
-          const SizedBox(height: 16),
-          Row(children: [
-            Expanded(child: TextField(controller: _cnicCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Patient CNIC'))),
-            const SizedBox(width: 8),
-            FilledButton(onPressed: _busy ? null : _findPatient, child: const Text('Find')),
-          ]),
-          if (_patient != null) ...[
-            const SizedBox(height: 8),
-            Text('Patient: ${_patient!['full_name']}', style: TextStyle(color: c.safe, fontWeight: FontWeight.w700)),
-          ],
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: _doctorId,
-            decoration: const InputDecoration(labelText: 'Doctor'),
-            items: _doctors
-                .map((d) => DropdownMenuItem(value: d['id'].toString(), child: Text(d['full_name']?.toString() ?? '')))
-                .toList(),
-            onChanged: (v) => setState(() => _doctorId = v),
-          ),
-          const SizedBox(height: 12),
-          TextField(controller: _dateCtrl, decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)')),
-          const SizedBox(height: 12),
-          TextField(controller: _timeCtrl, decoration: const InputDecoration(labelText: 'Time (HH:MM)')),
-          if (_error != null) ...[
-            const SizedBox(height: 10),
-            Text(_error!, style: TextStyle(color: c.danger)),
-          ],
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _busy ? null : _submit,
-              style: FilledButton.styleFrom(backgroundColor: c.primary, padding: const EdgeInsets.symmetric(vertical: 14)),
-              child: _busy
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Book appointment', style: TextStyle(fontWeight: FontWeight.w700)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'New appointment',
+              style: TextStyle(
+                color: c.text,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
             ),
-          ),
-        ]),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _hayaatIdCtrl,
+                    keyboardType: TextInputType.number,
+                    maxLength: 16,
+                    decoration: const InputDecoration(
+                      labelText: 'Patient Hayaat ID',
+                      counterText: '',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _busy ? null : _findPatient,
+                  child: const Text('Find'),
+                ),
+              ],
+            ),
+            if (_patient != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Patient: ${_patient!['full_name']}',
+                style: TextStyle(color: c.safe, fontWeight: FontWeight.w700),
+              ),
+            ],
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: _doctorId,
+              decoration: const InputDecoration(labelText: 'Doctor'),
+              items: _doctors
+                  .map(
+                    (d) => DropdownMenuItem(
+                      value: d['id'].toString(),
+                      child: Text(d['full_name']?.toString() ?? ''),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) => setState(() => _doctorId = v),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _dateCtrl,
+              decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _timeCtrl,
+              decoration: const InputDecoration(labelText: 'Time (HH:MM)'),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(_error!, style: TextStyle(color: c.danger)),
+            ],
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _busy ? null : _submit,
+                style: FilledButton.styleFrom(
+                  backgroundColor: c.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: _busy
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Book appointment',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

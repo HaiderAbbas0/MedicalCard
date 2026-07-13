@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configured per environment via Vite env vars (see .env.example). The defaults
-// below are the shared dev/demo project's *publishable* key — safe to ship because
+// below are the shared development project's *publishable* key — safe to ship because
 // Row Level Security enforces all access. Production builds MUST set VITE_SUPABASE_*.
 export const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL ?? 'https://iikwdtiqvxxatrzahuzo.supabase.co';
@@ -13,9 +13,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 });
 
 /**
- * CNIC/Employee ID/email → auth email.
+ * Hayaat ID/Employee ID/email → auth email fallback.
  *  - Already an email → used as-is.
- *  - All-digit identifier (13-digit CNIC) → `<digits>@hayaat.id`.
+ *  - All-digit identifier → `<digits>@hayaat.id` for phone-only legacy auth.
  *  - Alphanumeric identifier (receptionist Employee ID, e.g. "REC-005")
  *    → `<employee_id lowercased>@hayaat.id`, matching how
  *    admin-create-user aliases receptionist accounts.
@@ -25,7 +25,7 @@ export function emailFor(identifier: string): string {
   if (id.includes('@')) return id;
   const digitsOnly = id.replace(/\D/g, '');
   if (digitsOnly.length > 0 && digitsOnly === id.replace(/[\s-]/g, '')) {
-    // Pure numeric identifier (CNIC) — keep existing digit-stripping behavior.
+    // Pure numeric identifier — deterministic fallback for phone-only accounts.
     return `${digitsOnly}@hayaat.id`;
   }
   // Alphanumeric identifier (Employee ID) — normalize case, keep as-is otherwise.
@@ -56,4 +56,12 @@ export async function fetchFullProfile(userId: string) {
     if (ext) extended = ext;
   }
   return { ...base, extended };
+}
+
+/** Resolve Hayaat ID/phone/employee ID to the underlying Supabase Auth email. */
+export async function resolveLoginEmail(identifier: string): Promise<string> {
+  if (identifier.includes('@')) return identifier.trim().toLowerCase();
+  const { data, error } = await supabase.rpc('login_email', { p_id: identifier.trim() });
+  if (error) throw new Error(error.message);
+  return (data as string | null) ?? emailFor(identifier);
 }

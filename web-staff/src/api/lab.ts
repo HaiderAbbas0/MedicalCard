@@ -4,6 +4,8 @@ import type { LabQueueOrder } from './types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Q = any;
 const RANK: Record<string, number> = { stat: 0, urgent: 1, routine: 2 };
+const MAX_RESULT_BYTES = 25 * 1024 * 1024;
+const ALLOWED_RESULT_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 
 async function myLab(): Promise<string | null> {
   const { data } = await supabase.from('lab_worker_profiles').select('lab_id').eq('id', await myId()).maybeSingle();
@@ -55,17 +57,21 @@ export const labApi = {
     });
   },
 
-  async uploadResultFile(id: string, file: File, comments?: string) {
+  async uploadResultFile(id: string, file: File, comments?: string, onProgress?: (message: string) => void) {
+    if (file.size <= 0) throw new Error(`${file.name} is empty.`);
+    if (file.size > MAX_RESULT_BYTES) throw new Error(`${file.name} is larger than 25 MB.`);
+    if (file.type && !ALLOWED_RESULT_TYPES.has(file.type) && !/\.(pdf|jpe?g|png)$/i.test(file.name)) {
+      throw new Error('Upload a PDF, JPG, or PNG result file.');
+    }
     // Store under "<patient_id>/<order_id>/…" — the lab-results bucket is private
     // and RLS scopes reads to the owning patient + staff.
     const { data: order, error: e0 } = await supabase.from('lab_orders').select('patient_id').eq('id', id).single();
     if (e0) throw new Error(e0.message);
+    onProgress?.('Uploading file...');
     const path = `${order.patient_id}/${id}/${Date.now()}_${file.name}`;
     const { error } = await supabase.storage.from('lab-results').upload(path, file, { upsert: true });
     if (error) throw new Error(error.message);
-    // Private bucket → signed URL (valid 1 year) instead of a public URL.
-    const { data: signed, error: e2 } = await supabase.storage.from('lab-results').createSignedUrl(path, 60 * 60 * 24 * 365);
-    if (e2) throw new Error(e2.message);
-    await this.uploadResult(id, { result_file_name: file.name, result_file_url: signed.signedUrl, comments });
+    onProgress?.('Saving result metadata...');
+    await this.uploadResult(id, { result_file_name: file.name, result_file_path: path, comments });
   },
 };

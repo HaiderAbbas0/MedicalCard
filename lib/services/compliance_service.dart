@@ -25,6 +25,23 @@ class ComplianceService {
     return Map<String, dynamic>.from(res as Map);
   }
 
+  Future<Map<String, bool>> consentPreferences() async {
+    final uid = currentUid;
+    if (uid == null) return {};
+    final rows = await db.from('consent_preferences').select().eq('user_id', uid) as List;
+    return {
+      for (final row in rows)
+        (row['key'] ?? '').toString(): row['enabled'] == true,
+    };
+  }
+
+  Future<void> setConsentPreference(String key, bool enabled) async {
+    await db.rpc('set_consent_preference', params: {
+      'p_key': key,
+      'p_enabled': enabled,
+    });
+  }
+
   /// File a request to delete the account and all associated data. An admin
   /// fulfils it (the `delete-account` Edge Function performs the erasure).
   Future<void> requestAccountDeletion(String? reason) async {

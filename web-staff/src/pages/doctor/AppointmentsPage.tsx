@@ -3,14 +3,20 @@ import { doctorApi } from '../../api/doctor';
 import type { Appointment } from '../../api/types';
 import { Spinner, Empty, StatusBadge } from '../../components/ui';
 
+const localToday = () => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60_000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+};
+
 export default function AppointmentsPage() {
   const [appts, setAppts] = useState<Appointment[] | null>(null);
   const [error, setError] = useState('');
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(localToday);
 
   const load = useCallback(() => {
     setAppts(null);
-    doctorApi.appointments(date || undefined).then(setAppts).catch((e) => setError(e.message));
+    doctorApi.appointments(date).then(setAppts).catch((e) => setError(e.message));
   }, [date]);
 
   useEffect(load, [load]);
@@ -28,7 +34,7 @@ export default function AppointmentsPage() {
     <>
       <div className="toolbar">
         <input type="date" className="input" style={{ maxWidth: 200 }} value={date} onChange={(e) => setDate(e.target.value)} />
-        {date && <button className="btn btn-ghost" onClick={() => setDate('')}>Clear</button>}
+        {date !== localToday() && <button className="btn btn-ghost" onClick={() => setDate(localToday())}>Today</button>}
       </div>
 
       {error && <div className="error-text" style={{ marginBottom: 12 }}>{error}</div>}
@@ -37,18 +43,18 @@ export default function AppointmentsPage() {
         {!appts ? (
           <Spinner />
         ) : appts.length === 0 ? (
-          <Empty>No appointments{date ? ' for this date' : ''}.</Empty>
+          <Empty>No appointments for this date.</Empty>
         ) : (
           <table className="table">
             <thead>
-              <tr><th>Time</th><th>Patient</th><th>CNIC</th><th>Type</th><th>Status</th><th /></tr>
+              <tr><th>Time</th><th>Patient</th><th>Hayaat ID</th><th>Type</th><th>Status</th><th /></tr>
             </thead>
             <tbody>
               {appts.map((a) => (
                 <tr key={a.id}>
                   <td>{a.appointment_date} · {a.appointment_time}</td>
                   <td>{a.patient?.full_name ?? '—'}</td>
-                  <td className="mono">{a.patient?.cnic ?? '—'}</td>
+                  <td className="mono">{a.patient?.card_number?.replace(/(\d{4})(?=\d)/g, '$1 ') ?? '—'}</td>
                   <td>{a.appointment_type.replace(/_/g, ' ')}</td>
                   <td><StatusBadge status={a.status} /></td>
                   <td className="actions">

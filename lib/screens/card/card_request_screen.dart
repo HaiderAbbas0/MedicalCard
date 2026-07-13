@@ -343,7 +343,8 @@ class _CardRequestScreenState extends State<CardRequestScreen> {
       if (cachedBlood != null && _bloodGroups.contains(cachedBlood)) {
         _blood = cachedBlood;
       }
-      _existingPhotoUrl = prefs.getString('card_photo_url');
+      final cachedPhoto = prefs.getString('card_photo_url');
+      _existingPhotoUrl = cachedPhoto != null && cachedPhoto.startsWith('http') ? cachedPhoto : null;
     });
   }
 
@@ -412,7 +413,7 @@ class _CardRequestScreenState extends State<CardRequestScreen> {
       await prefs.setString('card_dob', dobStr);
       await prefs.setString('card_blood', _blood);
       await prefs.setString('card_city', _cityCtrl.text.trim());
-      if (photoUrl != null) await prefs.setString('card_photo_url', photoUrl);
+      await prefs.remove('card_photo_url');
 
       if (!mounted) return;
       context.read<CardController>().setCard(card);

@@ -11,7 +11,7 @@ function passwordPolicyError(pw: string): string | null {
 /** Doctor self-registration (P-FR-002). Account is created PENDING. */
 export default function DoctorRegisterPage() {
   const [form, setForm] = useState({
-    full_name: '', cnic: '', phone_primary: '', email: '', password: '',
+    full_name: '', phone_primary: '', email: '', password: '',
     pmdc_number: '', specialization_primary: '',
     qualification_mbbs: true, qualification_fcps: false,
   });
@@ -25,21 +25,20 @@ export default function DoctorRegisterPage() {
 
   async function submit() {
     setError('');
-    if (form.cnic.trim().length !== 13) return setError('CNIC must be 13 digits.');
     if (!form.full_name.trim() || !form.password || !form.pmdc_number.trim() || !form.specialization_primary.trim()) {
       return setError('Name, password, PMDC number, and specialization are required.');
     }
+    if (!form.email.trim() && !form.phone_primary.trim()) return setError('Email or phone is required.');
     const pwErr = passwordPolicyError(form.password);
     if (pwErr) return setError(pwErr);
     setBusy(true);
     try {
       const { error } = await supabase.auth.signUp({
-        email: emailFor(form.cnic.trim()),
+        email: form.email.trim().toLowerCase() || emailFor(form.phone_primary.replace(/\D/g, '')),
         password: form.password,
         options: {
           data: {
             role: 'doctor',
-            cnic: form.cnic.trim(),
             full_name: form.full_name.trim(),
             phone: form.phone_primary.trim(),
             email: form.email.trim() || undefined,
@@ -81,8 +80,6 @@ export default function DoctorRegisterPage() {
 
         <div className="field"><label>Full name *</label>
           <input className="input" value={form.full_name} onChange={(e) => set('full_name', e.target.value)} /></div>
-        <div className="field"><label>CNIC * (13 digits)</label>
-          <input className="input" maxLength={13} value={form.cnic} onChange={(e) => set('cnic', e.target.value.replace(/\D/g, ''))} /></div>
         <div className="row">
           <div className="field" style={{ flex: 1 }}><label>Phone</label>
             <input className="input" value={form.phone_primary} onChange={(e) => set('phone_primary', e.target.value)} /></div>

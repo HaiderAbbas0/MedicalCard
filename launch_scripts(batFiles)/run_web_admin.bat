@@ -1,6 +1,6 @@
 @echo off
 echo ===================================================
-echo Starting CNIC Health Card - Admin Web App
+echo Starting Hayaat ID - Admin Web App
 echo ===================================================
 echo (Talks directly to Supabase - there is no backend to start.)
 

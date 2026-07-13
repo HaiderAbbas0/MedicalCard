@@ -19,6 +19,25 @@ export default function AvailabilityPage() {
   useEffect(load, [load]);
 
   async function add() {
+    setError('');
+    if (form.slot_duration_minutes <= 0 || !Number.isInteger(form.slot_duration_minutes)) {
+      setError('Slot length must be a whole number greater than 0 minutes.');
+      return;
+    }
+    if (form.start_time >= form.end_time) {
+      setError('End time must be later than start time.');
+      return;
+    }
+    const duplicate = slots?.some((slot) =>
+      slot.day_of_week === form.day_of_week &&
+      slot.start_time.slice(0, 5) === form.start_time &&
+      slot.end_time.slice(0, 5) === form.end_time &&
+      slot.slot_duration_minutes === form.slot_duration_minutes,
+    );
+    if (duplicate) {
+      setError('This weekly slot already exists.');
+      return;
+    }
     setBusy(true);
     try {
       await doctorApi.addAvailability(form);
@@ -49,7 +68,7 @@ export default function AvailabilityPage() {
           </select>
           <input type="time" className="input" style={{ maxWidth: 130 }} value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
           <input type="time" className="input" style={{ maxWidth: 130 }} value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
-          <input type="number" className="input" style={{ maxWidth: 110 }} value={form.slot_duration_minutes} onChange={(e) => setForm({ ...form, slot_duration_minutes: Number(e.target.value) })} />
+          <input type="number" className="input" style={{ maxWidth: 130 }} min={1} step={1} aria-label="Slot length in minutes" value={form.slot_duration_minutes} onChange={(e) => setForm({ ...form, slot_duration_minutes: Number(e.target.value) })} />
           <button className="btn btn-primary" onClick={add} disabled={busy}>Add slot</button>
         </div>
       </div>

@@ -2,17 +2,24 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doctorApi } from '../../api/doctor';
 import { Spinner } from '../../components/ui';
+import { useAuth } from '../../auth/AuthContext';
 
 const SPECIALTIES = [
-  'General Medicine', 'Cardiology', 'Dermatology', 'Pediatrics',
-  'Gynecology & Obstetrics', 'Orthopedics', 'ENT', 'Ophthalmology',
-  'Neurology', 'Psychiatry', 'Gastroenterology', 'Pulmonology',
-  'Endocrinology', 'Urology', 'Nephrology', 'Oncology', 'Dentistry',
+  'Neurology', 'Eye Care', 'ENT', 'Dental & Oral Health', 'Dermatology',
+  'Cardiology', 'Respiratory Care', 'Gastroenterology', 'Liver & Gallbladder',
+  'Kidney Care', 'Urology', 'Women’s Health', 'Pregnancy & Maternity',
+  'Endocrinology', 'Orthopedics', 'Rheumatology', 'Hematology', 'Cancer Care',
+  'Allergy & Immunology', 'Infectious Diseases', 'Mental Health', 'Child Health',
+  'General & Family Medicine', 'Surgery & Procedures', 'Laboratory Medicine',
+  'Imaging', 'Emergency & Critical Care', 'Rehabilitation & Pain Care',
+  'Genetics & Rare Diseases',
 ];
 
 export default function NewEncounterPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const doctor = (user?.extended ?? {}) as Record<string, unknown>;
   const created = useRef(false);
 
   const [encounterId, setEncounterId] = useState<string | null>(null);
@@ -21,7 +28,7 @@ export default function NewEncounterPage() {
 
   const [chief, setChief] = useState('');
   const [followUp, setFollowUp] = useState('');
-  const [specialty, setSpecialty] = useState('General Medicine');
+  const [specialty, setSpecialty] = useState('General & Family Medicine');
   const [diagnoses, setDiagnoses] = useState<string[]>([]);
   const [meds, setMeds] = useState<string[]>([]);
   const [vitals, setVitals] = useState<string[]>([]);
@@ -33,6 +40,9 @@ export default function NewEncounterPage() {
   const [medInput, setMedInput] = useState('');
   const [medStrength, setMedStrength] = useState('');
   const [medDuration, setMedDuration] = useState('');
+  const [medRoute, setMedRoute] = useState('oral');
+  const [medFrequency, setMedFrequency] = useState('');
+  const [medInstructions, setMedInstructions] = useState('');
   const [medTimes, setMedTimes] = useState({ morning: false, afternoon: false, evening: false, night: false });
   const [vitalName, setVitalName] = useState('');
   const [vitalValue, setVitalValue] = useState('');
@@ -66,11 +76,24 @@ export default function NewEncounterPage() {
 
   async function addMed() {
     if (!medInput.trim() || !encounterId) return;
+    const duration = medDuration.trim() ? Number(medDuration.trim()) : undefined;
+    if (duration !== undefined && (!Number.isInteger(duration) || duration <= 0)) {
+      setError('Medication duration must be a whole number greater than 0 days.');
+      return;
+    }
+    if (!medFrequency && !Object.values(medTimes).some(Boolean)) {
+      setError('Choose a frequency or at least one time of day.');
+      return;
+    }
+    setError('');
     await run(async () => {
       const res = await doctorApi.addMedication(encounterId, {
         medication_name: medInput.trim(),
         dosage_unit: medStrength.trim() || undefined,
-        duration_days: medDuration.trim() ? Number(medDuration.trim()) : undefined,
+        duration_days: duration,
+        route: medRoute,
+        frequency: medFrequency || undefined,
+        instructions: medInstructions.trim() || undefined,
         dose_morning: medTimes.morning,
         dose_afternoon: medTimes.afternoon,
         dose_evening: medTimes.evening,
@@ -84,6 +107,8 @@ export default function NewEncounterPage() {
       setMedInput('');
       setMedStrength('');
       setMedDuration('');
+      setMedFrequency('');
+      setMedInstructions('');
       setMedTimes({ morning: false, afternoon: false, evening: false, night: false });
       if (res.allergy_warning) setWarning(res.allergy_warning);
     });
@@ -157,10 +182,30 @@ export default function NewEncounterPage() {
       </Section>
 
       <Section title="Medications" items={meds}>
+        <div className="prescription-preview" aria-label="Prescription template preview">
+          <div className="prescription-rx">℞</div>
+          <div><strong>{medInput.trim() || 'Medication name'}</strong> <span className="muted">{medStrength.trim() || 'strength'}</span></div>
+          <div className="muted">{medRoute || 'route'} · {medFrequency || 'frequency / schedule'} · {medDuration ? `${medDuration} days` : 'duration'}</div>
+          <div style={{ marginTop: 8 }}>{medInstructions.trim() || 'Directions for the patient will appear here.'}</div>
+          <div className="prescription-signature">
+            <strong>{String(doctor.prescription_signature_name ?? user?.full_name ?? 'Doctor name')}</strong><br />
+            {String(doctor.prescription_signature_credentials ?? ([doctor.qualification_mbbs ? 'MBBS' : '', doctor.qualification_fcps ? 'FCPS' : ''].filter(Boolean).join(', ') || 'Qualifications'))}<br />
+            <span className="muted">{String(doctor.prescription_signature_footer ?? doctor.pmdc_number ?? 'Registration / designation')}</span>
+          </div>
+        </div>
         <div className="row">
           <input className="input" placeholder="Medication name" value={medInput} onChange={(e) => setMedInput(e.target.value)} />
           <input className="input" style={{ maxWidth: 140 }} placeholder="Strength (500mg)" value={medStrength} onChange={(e) => setMedStrength(e.target.value)} />
-          <input className="input" style={{ maxWidth: 130 }} placeholder="Days" type="number" value={medDuration} onChange={(e) => setMedDuration(e.target.value)} />
+          <input className="input" style={{ maxWidth: 130 }} placeholder="Days" aria-label="Duration in days" min={1} step={1} type="number" value={medDuration} onChange={(e) => setMedDuration(e.target.value)} />
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <select className="select" style={{ maxWidth: 150 }} aria-label="Medication route" value={medRoute} onChange={(e) => setMedRoute(e.target.value)}>
+            <option value="oral">Oral</option><option value="topical">Topical</option><option value="inhaled">Inhaled</option><option value="injection">Injection</option><option value="other">Other</option>
+          </select>
+          <select className="select" style={{ maxWidth: 190 }} aria-label="Medication frequency" value={medFrequency} onChange={(e) => setMedFrequency(e.target.value)}>
+            <option value="">Select frequency</option><option value="once_daily">Once daily</option><option value="twice_daily">Twice daily</option><option value="three_times_daily">Three times daily</option><option value="as_needed">As needed</option>
+          </select>
+          <input className="input" placeholder="Patient directions (e.g. take after food)" value={medInstructions} onChange={(e) => setMedInstructions(e.target.value)} />
         </div>
         <div className="row" style={{ marginTop: 8, gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <span className="muted" style={{ fontSize: 13 }}>When to take:</span>

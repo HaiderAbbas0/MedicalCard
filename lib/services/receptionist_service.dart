@@ -9,7 +9,11 @@ class ReceptionistService {
   String get _me => currentUid ?? '';
 
   Future<String?> _myClinic() async {
-    final r = await db.from('receptionist_profiles').select('clinic_id').eq('id', _me).maybeSingle();
+    final r = await db
+        .from('receptionist_profiles')
+        .select('clinic_id')
+        .eq('id', _me)
+        .maybeSingle();
     return r?['clinic_id']?.toString();
   }
 
@@ -18,7 +22,9 @@ class ReceptionistService {
     if (clinic == null) return [];
     var q = db
         .from('appointments')
-        .select('*, patient:profiles!patient_id(id, full_name, cnic, phone_primary), doctor:profiles!doctor_id(full_name)')
+        .select(
+          '*, patient:profiles!patient_id(id, full_name, card_number, phone_primary), doctor:profiles!doctor_id(full_name)',
+        )
         .eq('clinic_id', clinic);
     if (date != null) q = q.eq('appointment_date', date);
     final rows = await q as List;
@@ -33,28 +39,34 @@ class ReceptionistService {
   Future<List<Map<String, dynamic>>> clinicDoctors() async {
     final clinic = await _myClinic();
     if (clinic == null) return [];
-    final rows = await db
-        .from('doctor_profiles')
-        .select('id, specialization_primary, profiles!id(full_name, status)')
-        .eq('clinic_id', clinic) as List;
+    final rows =
+        await db
+                .from('doctor_profiles')
+                .select(
+                  'id, specialization_primary, profiles!id(full_name, status)',
+                )
+                .eq('clinic_id', clinic)
+            as List;
     return rows
         .where((r) => (r['profiles'] as Map?)?['status'] == 'active')
-        .map((r) => {
-              'id': r['id'],
-              'full_name': (r['profiles'] as Map?)?['full_name'] ?? '',
-              'specialization_primary': r['specialization_primary'] ?? '',
-            })
+        .map(
+          (r) => {
+            'id': r['id'],
+            'full_name': (r['profiles'] as Map?)?['full_name'] ?? '',
+            'specialization_primary': r['specialization_primary'] ?? '',
+          },
+        )
         .toList();
   }
 
-  Future<Map<String, dynamic>> searchPatient(String cnic) async {
+  Future<Map<String, dynamic>> searchPatient(String hayaatId) async {
     final p = await db
         .from('profiles')
-        .select('id, full_name, cnic, phone_primary')
-        .eq('cnic', cnic)
+        .select('id, full_name, card_number, phone_primary')
+        .eq('card_number', hayaatId.replaceAll(RegExp(r'\D'), ''))
         .eq('role', 'patient')
         .maybeSingle();
-    if (p == null) throw Exception('No patient found with that CNIC.');
+    if (p == null) throw Exception('No patient found with that Hayaat ID.');
     return Map<String, dynamic>.from(p);
   }
 
@@ -80,16 +92,31 @@ class ReceptionistService {
       if (notes != null) 'notes_for_doctor': notes,
     });
     await db.from('notifications').insert([
-      {'recipient_id': doctorId, 'type': 'appointment_booked', 'title': 'New appointment request', 'body': 'A receptionist booked an appointment.'},
-      {'recipient_id': patientId, 'type': 'appointment_booked', 'title': 'Appointment booked', 'body': 'An appointment has been booked for you.'},
+      {
+        'recipient_id': doctorId,
+        'type': 'appointment_booked',
+        'title': 'New appointment request',
+        'body': 'A receptionist booked an appointment.',
+      },
+      {
+        'recipient_id': patientId,
+        'type': 'appointment_booked',
+        'title': 'Appointment booked',
+        'body': 'An appointment has been booked for you.',
+      },
     ]);
   }
 
-  Future<void> checkIn(String appointmentId) =>
-      db.from('appointments').update({'status': 'checked_in'}).eq('id', appointmentId);
+  Future<void> checkIn(String appointmentId) => db
+      .from('appointments')
+      .update({'status': 'checked_in'})
+      .eq('id', appointmentId);
 
-  Future<void> cancel(String appointmentId, {String? reason}) => db.from('appointments').update({
+  Future<void> cancel(String appointmentId, {String? reason}) => db
+      .from('appointments')
+      .update({
         'status': 'cancelled_by_patient',
         if (reason != null) 'cancellation_reason': reason,
-      }).eq('id', appointmentId);
+      })
+      .eq('id', appointmentId);
 }

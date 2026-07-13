@@ -1,10 +1,7 @@
-# CNIC-Based Health Card System
+# HayaatID Health Platform
 
-A centralized digital health-card platform for Pakistan: every citizen's medical
-history is linked to their CNIC, accessible to any approved clinic, hospital, or
-lab with consent. This repository implements the system described in
-`docs/ibbi docs/CNIC_Health_Card_System_Design.pdf` (prototype scope:
-`CNIC_Health_Card_PROTOTYPE_Scope.pdf`).
+A centralized digital health-card platform where each patient and staff member
+receives a random, unique, 16-digit numeric Hayaat ID.
 
 ## Architecture: Supabase-first (single production backend)
 
@@ -22,7 +19,7 @@ directly — there is no separate application API server.
 
 | Layer | Responsibility |
 | ----- | -------------- |
-| **Supabase Auth** | Identity, sessions, JWTs. Login via CNIC / phone / card-number → `<id>@hayaat.id`. |
+| **Supabase Auth** | Identity and sessions. Login via Hayaat ID, email, phone, or staff Employee ID. |
 | **Supabase Postgres** | All data. **Row Level Security on every table** (verified by an automated suite), `SECURITY DEFINER` role helpers, triggers, audit log. See `supabase/`. |
 | **Supabase Storage** | `lab-results` (private, signed-URL access) and `card-photos` (owner-write) buckets. |
 | **Supabase Realtime** | Live delivery of chat messages between patient and doctor. |
@@ -45,7 +42,7 @@ directly — there is no separate application API server.
 | Role          | Client       | Highlights                                                        |
 | ------------- | ------------ | ----------------------------------------------------------------- |
 | Patient       | Mobile       | Health timeline, prescriptions, lab results, book appointments, **chat with doctors**, digital card, **data export / account deletion** |
-| Doctor        | Mobile + Web | Search patient by CNIC, encounters, prescribe (allergy check), lab orders, review/release results, availability, **Messages** |
+| Doctor        | Mobile + Web | Search patient by Hayaat ID, encounters, prescribe (allergy check), lab orders, review/release results, availability, **Messages** |
 | Lab worker    | Mobile + Web | Priority order queue, sample tracking, result upload (masked patient identity) |
 | Receptionist  | Mobile + Web | Clinic schedule, walk-in booking, check-in (demographics only)    |
 | Admin         | Web          | Approve doctors/labs, suspend/reactivate users, clinics, dashboard, audit log, **notification bell**, **card-delivery queue**, **account-deletion requests** |
@@ -60,7 +57,7 @@ directly — there is no separate application API server.
   `messages`, participant-only RLS, **Realtime**). Patient side in Flutter; doctor
   side is the `web-staff` **Messages** page. (The old fake/stub chat is gone.)
 - **Digital + physical card** — patients request a card (issued instantly with a
-  `HAY-PAT-####` number); can request physical delivery.
+  16-digit Hayaat ID); can request physical delivery.
 - **Card workflow → admin notifications** — applying for a card, or requesting
   delivery, sends an in-app notification to every admin (bell in the admin portal),
   and physical requests appear in the admin **Card Deliveries** queue.
@@ -84,12 +81,15 @@ Follow **[`supabase/SUPABASE_SETUP.md`](supabase/SUPABASE_SETUP.md)**. In the SQ
 editor, run these **in order** (all idempotent):
 
 ```
-schema.sql → cards.sql → revision.sql → security.sql → fix_demo_login.sql
-          → chat.sql → security_hardening.sql → compliance.sql → card_workflow.sql
-          → perf_indexes.sql
+schema.sql → cards.sql → revision.sql → security.sql → chat.sql
+          → security_hardening.sql → compliance.sql → card_workflow.sql
+          → perf_indexes.sql → product_hardening.sql → remove_demo_data.sql
+          → hayaat_id_only.sql → patient_records.sql
 ```
 
 `security.sql` **and** `security_hardening.sql` are mandatory (they harden RLS).
+The legacy development seed inside `schema.sql` is disabled by default. Do not
+enable it in staging or production.
 Then turn OFF Authentication → Email → "Confirm email" in the dashboard. Deploy the
 Edge Functions (optional but recommended):
 
@@ -116,7 +116,7 @@ flutter run \
   --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
-If unset, all three fall back to the shared dev/demo project baked into source.
+If unset, all three fall back to the shared development project baked into source.
 
 ### 3. Run the web apps
 
@@ -134,19 +134,6 @@ flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_PUBLISHABLE_KE
 
 > Flutter on Windows needs **Developer Mode** (`ms-settings:developers`) enabled
 > for plugin symlinks before `flutter pub get` will succeed.
-
-## Demo accounts (password: `password123`)
-
-| Role          | Login (CNIC)      |
-| ------------- | ----------------- |
-| Patient       | `3520112345671`   |
-| Doctor        | `3520199999991`   |
-| Lab worker    | `3520177777771`   |
-| Receptionist  | `3520166666661`   |
-| Admin (web)   | `3520100000001`   |
-
-A **pending** doctor (`3520188888882`) is seeded so the admin approval queue is
-populated for a live demo. Passwords are bcrypt-hashed in Postgres.
 
 ## Testing & verification
 
@@ -170,7 +157,7 @@ Last verified (against the live dev project): RLS suite **27/27**, card workflow
 
 ## Known gaps / blocked (need credentials or a product decision)
 
-- **OTP** — sign-up OTP is a hardcoded demo code (`11111`); wiring a real OTP/SMS
+- **OTP** — sign-up OTP is a hardcoded development code (`11111`); wiring a real OTP/SMS
   provider (e.g. Twilio) is pending.
 - **MFA & email password reset** — need an SMS/email provider configured in
   Supabase Auth.

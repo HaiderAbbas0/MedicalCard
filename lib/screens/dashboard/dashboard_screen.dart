@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../controllers/auth_controller.dart';
 import '../../controllers/record_controller.dart';
+import '../../data/mock_data.dart' show Patient, UserPatientExtension;
 import '../../controllers/card_controller.dart';
-import '../../data/mock_data.dart';
 import '../../models/record_models.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -23,7 +24,16 @@ class DashboardScreen extends StatelessWidget {
     final auth = context.watch<AuthController>();
     final rec = context.watch<RecordController>();
     final cardCtrl = context.watch<CardController>();
-    final p = auth.currentUser?.toPatient() ?? mockPatient;
+    final p = auth.currentUser?.toPatient();
+    if (p == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            'Your patient profile could not be loaded. Please sign in again.',
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: context.c.bg,
@@ -83,13 +93,18 @@ class DashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Assalam-o-Alaikum',
-                  style: AppText.caption.copyWith(color: c.text2)),
+              Text(
+                'Assalam-o-Alaikum',
+                style: AppText.caption.copyWith(color: c.text2),
+              ),
               const SizedBox(height: 2),
               Text(
                 p.name,
-                style: AppText.heading
-                    .copyWith(color: c.text, fontSize: 19, fontWeight: FontWeight.w800),
+                style: AppText.heading.copyWith(
+                  color: c.text,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -112,8 +127,11 @@ class DashboardScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(13),
                   border: Border.all(color: c.border),
                 ),
-                child: Icon(Icons.notifications_outlined,
-                    size: 20, color: c.text2),
+                child: Icon(
+                  Icons.notifications_outlined,
+                  size: 20,
+                  color: c.text2,
+                ),
               ),
               Positioned(
                 right: 9,
@@ -140,7 +158,10 @@ class DashboardScreen extends StatelessWidget {
     if (cardCtrl.card != null) {
       return GestureDetector(
         onTap: () => context.push('/card'),
-        child: HayaatCard(card: cardCtrl.card!, gender: context.read<AuthController>().currentUser?.gender),
+        child: HayaatCard(
+          card: cardCtrl.card!,
+          gender: context.read<AuthController>().currentUser?.gender,
+        ),
       );
     }
     return GestureDetector(
@@ -158,19 +179,35 @@ class DashboardScreen extends StatelessWidget {
               width: 52,
               height: 52,
               alignment: Alignment.center,
-              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(14)),
-              child: const Icon(Icons.add_card_rounded, color: Colors.white, size: 26),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.add_card_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Request your HayaatID card',
-                      style: AppText.bodyStrong.copyWith(color: Colors.white, fontSize: 16)),
+                  Text(
+                    'Request your HayaatID card',
+                    style: AppText.bodyStrong.copyWith(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text('Get your unique health ID and digital card.',
-                      style: AppText.caption.copyWith(color: Colors.white.withValues(alpha: 0.9))),
+                  Text(
+                    'Get your unique health ID and digital card.',
+                    style: AppText.caption.copyWith(
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -187,12 +224,19 @@ class DashboardScreen extends StatelessWidget {
 
     final medPreview = rec.activePrescriptions
         .take(4)
-        .map((m) => StatPreviewItem(text: '${m.name} (${m.strength})', color: m.warn != null ? c.danger : c.safe))
+        .map(
+          (m) => StatPreviewItem(
+            text: '${m.name} (${m.strength})',
+            color: m.warn != null ? c.danger : c.safe,
+          ),
+        )
         .toList();
 
     final allergyPreview = rec.allergies
         .take(4)
-        .map((a) => StatPreviewItem(text: (a['substance_name'] ?? '').toString()))
+        .map(
+          (a) => StatPreviewItem(text: (a['substance_name'] ?? '').toString()),
+        )
         .toList();
 
     final visitPreview = rec.visits
@@ -244,7 +288,8 @@ class DashboardScreen extends StatelessWidget {
               ? const []
               : [
                   StatPreviewItem(text: next.doctorName ?? ''),
-                  if (next.clinicName != null) StatPreviewItem(text: next.clinicName!),
+                  if (next.clinicName != null)
+                    StatPreviewItem(text: next.clinicName!),
                   StatPreviewItem(text: '${next.date} · ${next.time}'),
                 ],
           onTap: () => context.push('/my-appointments'),
@@ -257,7 +302,20 @@ class DashboardScreen extends StatelessWidget {
   String _shortDate(String iso) {
     final d = DateTime.tryParse(iso);
     if (d == null) return iso;
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${d.day.toString().padLeft(2, '0')} ${months[d.month - 1]}';
   }
 
@@ -275,8 +333,8 @@ class DashboardScreen extends StatelessWidget {
           ),
           const SizedBox(width: 13),
           _QuickAction(
-            icon: Icons.history_rounded,
-            label: 'History',
+            icon: Icons.folder_special_rounded,
+            label: 'Records',
             onTap: () => context.go('/history'),
           ),
           const SizedBox(width: 13),
@@ -315,7 +373,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  void _showSos(BuildContext context) {
+  Future<void> _showSos(BuildContext context) async {
     final c = context.c;
     showDialog<void>(
       context: context,
@@ -339,12 +397,23 @@ class DashboardScreen extends StatelessWidget {
             semanticLabel: 'Cancel',
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Text('Cancel',
-                  style: AppText.bodyStrong.copyWith(color: c.text2)),
+              child: Text(
+                'Cancel',
+                style: AppText.bodyStrong.copyWith(color: c.text2),
+              ),
             ),
           ),
           PressScale(
-            onTap: () => Navigator.of(ctx).pop(),
+            onTap: () async {
+              Navigator.of(ctx).pop();
+              final uri = Uri(scheme: 'tel', path: '1122');
+              if (!await launchUrl(uri)) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Could not open the phone dialer.')),
+                );
+              }
+            },
             semanticLabel: 'Call 1122',
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -352,8 +421,10 @@ class DashboardScreen extends StatelessWidget {
                 color: c.danger,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text('Call 1122',
-                  style: AppText.bodyStrong.copyWith(color: Colors.white)),
+              child: Text(
+                'Call 1122',
+                style: AppText.bodyStrong.copyWith(color: Colors.white),
+              ),
             ),
           ),
         ],
@@ -369,8 +440,11 @@ class DashboardScreen extends StatelessWidget {
         Expanded(
           child: Text(
             'Recent activity',
-            style: AppText.title
-                .copyWith(color: c.text, fontSize: 16, fontWeight: FontWeight.w800),
+            style: AppText.title.copyWith(
+              color: c.text,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
         PressScale(
@@ -378,8 +452,10 @@ class DashboardScreen extends StatelessWidget {
           semanticLabel: 'See all activity',
           child: Text(
             'See all',
-            style: AppText.caption
-                .copyWith(color: c.primary, fontWeight: FontWeight.w700),
+            style: AppText.caption.copyWith(
+              color: c.primary,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
@@ -399,7 +475,10 @@ class DashboardScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: c.border),
         ),
-        child: Text('No visits yet.', style: AppText.body.copyWith(color: c.text3)),
+        child: Text(
+          'No visits yet.',
+          style: AppText.body.copyWith(color: c.text3),
+        ),
       );
     }
 
@@ -444,14 +523,20 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   Text(
                     v.dx,
-                    style: AppText.bodyStrong.copyWith(color: c.text, fontSize: 14),
+                    style: AppText.bodyStrong.copyWith(
+                      color: c.text,
+                      fontSize: 14,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 3),
                   Text(
                     '${v.doctor} · ${v.specialty}',
-                    style: AppText.caption.copyWith(color: c.text2, fontSize: 12),
+                    style: AppText.caption.copyWith(
+                      color: c.text2,
+                      fontSize: 12,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -520,7 +605,10 @@ class _StatCard extends StatelessWidget {
                 child: Text(
                   label,
                   style: AppText.caption.copyWith(
-                      color: c.text2, fontSize: 12, fontWeight: FontWeight.w700),
+                    color: c.text2,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -546,7 +634,8 @@ class _StatCard extends StatelessWidget {
                                 width: 4.5,
                                 height: 4.5,
                                 decoration: BoxDecoration(
-                                  color: item.color ?? dot.withValues(alpha: 0.7),
+                                  color:
+                                      item.color ?? dot.withValues(alpha: 0.7),
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -580,9 +669,10 @@ class _StatCard extends StatelessWidget {
               Text(
                 value,
                 style: AppText.heading.copyWith(
-                    color: valueColor ?? c.text,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800),
+                  color: valueColor ?? c.text,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
@@ -638,9 +728,10 @@ class _QuickAction extends StatelessWidget {
           Text(
             label,
             style: AppText.small.copyWith(
-                color: danger ? c.danger : c.text2,
-                fontSize: 11,
-                fontWeight: FontWeight.w700),
+              color: danger ? c.danger : c.text2,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),

@@ -21,7 +21,7 @@ const kBgLight = Color(0xFFF3F6F4);
 const kSurfaceLight = Color(0xFFFFFFFF);
 const kTextLight = Color(0xFF0F201B);
 const kText2Light = Color(0xFF5C6B66);
-const kText3Light = Color(0xFF94A39E);
+const kText3Light = Color(0xFF5C6B66);
 const kBorderLight = Color(0xFFE6ECE9);
 const kMintLight = Color(0xFFE4F4EC);
 
@@ -30,7 +30,7 @@ const kBgDark = Color(0xFF0B1310);
 const kSurfaceDark = Color(0xFF13201B);
 const kTextDark = Color(0xFFEAF3EF);
 const kText2Dark = Color(0xFF9FB2AC);
-const kText3Dark = Color(0xFF6C7E78);
+const kText3Dark = Color(0xFFB6C8C1);
 const kBorderDark = Color(0xFF26332E);
 const kMintDark = Color(0xFF13302A);
 

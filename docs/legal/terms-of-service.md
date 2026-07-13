@@ -1,4 +1,4 @@
-# Terms & Conditions — SehatID / HayaatID
+# Terms & Conditions — HayaatID
 
 **Version:** 2026-07-04 · **Last updated:** 4 July 2026
 
@@ -15,7 +15,7 @@ By creating an account or using the platform you agree to these Terms and to the
 clinicians are **not** monitored in real time and must not be used for urgent care.
 
 ## 3. Accounts and roles
-- One CNIC maps to one account. You are responsible for keeping your credentials
+- One Hayaat ID maps to one account. You are responsible for keeping your credentials
   secure and for activity under your account.
 - **Doctors** register as *pending* and may not access the service until an
   administrator approves them. Staff accounts (lab worker, receptionist, admin)

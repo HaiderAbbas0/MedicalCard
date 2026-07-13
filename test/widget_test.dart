@@ -1,4 +1,4 @@
-// Basic smoke test for the SehatID app.
+// Basic smoke test for the HayaatID app.
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -10,6 +10,6 @@ void main() {
     await tester.pump();
 
     // The splash screen renders the brand name.
-    expect(find.textContaining('Sehat'), findsWidgets);
+    expect(find.textContaining('Hayaat'), findsWidgets);
   });
 }

@@ -16,7 +16,7 @@ export const chatApi = {
   async conversations(): Promise<ChatConversation[]> {
     const me = await myId();
     const convos = await rows<Q>(
-      supabase.from('conversations').select('*, patient:profiles!patient_id(id, full_name, cnic)')
+      supabase.from('conversations').select('*, patient:profiles!patient_id(id, full_name, card_number)')
         .eq('doctor_id', me).order('last_message_at', { ascending: false, nullsFirst: false }),
     );
     if (convos.length === 0) return [];

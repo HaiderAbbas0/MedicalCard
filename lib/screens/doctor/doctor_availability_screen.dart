@@ -6,14 +6,23 @@ import '../../services/doctor_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/brand_app_bar.dart';
 
-const _days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const _days = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
 
 /// Doctor manages weekly availability slots (Scope §7.2 / UC-D005, P-FR-030).
 class DoctorAvailabilityScreen extends StatefulWidget {
   const DoctorAvailabilityScreen({super.key});
 
   @override
-  State<DoctorAvailabilityScreen> createState() => _DoctorAvailabilityScreenState();
+  State<DoctorAvailabilityScreen> createState() =>
+      _DoctorAvailabilityScreenState();
 }
 
 class _DoctorAvailabilityScreenState extends State<DoctorAvailabilityScreen> {
@@ -43,7 +52,10 @@ class _DoctorAvailabilityScreenState extends State<DoctorAvailabilityScreen> {
       await _service.deleteAvailability(id);
       _reload();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -67,9 +79,17 @@ class _DoctorAvailabilityScreenState extends State<DoctorAvailabilityScreen> {
           }
           final slots = snap.data ?? [];
           if (slots.isEmpty) {
-            return Center(child: Text('No availability slots yet.', style: TextStyle(color: c.text3)));
+            return Center(
+              child: Text(
+                'No availability slots yet.',
+                style: TextStyle(color: c.text3),
+              ),
+            );
           }
-          slots.sort((a, b) => (a['day_of_week'] as num).compareTo(b['day_of_week'] as num));
+          slots.sort(
+            (a, b) =>
+                (a['day_of_week'] as num).compareTo(b['day_of_week'] as num),
+          );
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             itemCount: slots.length,
@@ -84,20 +104,33 @@ class _DoctorAvailabilityScreenState extends State<DoctorAvailabilityScreen> {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: c.border),
                 ),
-                child: Row(children: [
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(_days[dow], style: TextStyle(color: c.text, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 2),
-                      Text('${s['start_time']} – ${s['end_time']}  ·  ${s['slot_duration_minutes']} min slots',
-                          style: TextStyle(color: c.text2, fontSize: 13)),
-                    ]),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.delete_outline, color: c.danger),
-                    onPressed: () => _delete(s['id'].toString()),
-                  ),
-                ]),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _days[dow],
+                            style: TextStyle(
+                              color: c.text,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${s['start_time']} – ${s['end_time']}  ·  ${s['slot_duration_minutes']} min slots',
+                            style: TextStyle(color: c.text2, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.delete_outline, color: c.danger),
+                      onPressed: () => _delete(s['id'].toString()),
+                    ),
+                  ],
+                ),
               );
             },
           );
@@ -132,17 +165,35 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
   }
 
   Future<void> _save() async {
-    setState(() { _busy = true; _error = null; });
+    final duration = int.tryParse(_durCtrl.text.trim());
+    if (duration == null || duration <= 0) {
+      setState(
+        () => _error =
+            'Slot length must be a whole number greater than 0 minutes.',
+      );
+      return;
+    }
+    if (_startCtrl.text.trim().compareTo(_endCtrl.text.trim()) >= 0) {
+      setState(() => _error = 'End time must be later than start time.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
       await widget.service.addAvailability(
         dayOfWeek: _day,
         startTime: _startCtrl.text.trim(),
         endTime: _endCtrl.text.trim(),
-        slotDurationMinutes: int.tryParse(_durCtrl.text.trim()) ?? 30,
+        slotDurationMinutes: duration,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      setState(() { _error = e.toString(); _busy = false; });
+      setState(() {
+        _error = e.toString();
+        _busy = false;
+      });
     }
   }
 
@@ -150,37 +201,90 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
   Widget build(BuildContext context) {
     final c = context.c;
     return Padding(
-      padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: MediaQuery.of(context).viewInsets.bottom + 20),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Add availability slot', style: TextStyle(color: c.text, fontWeight: FontWeight.w800, fontSize: 18)),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<int>(
-          initialValue: _day,
-          decoration: const InputDecoration(labelText: 'Day of week'),
-          items: List.generate(7, (i) => DropdownMenuItem(value: i, child: Text(_days[i]))),
-          onChanged: (v) => setState(() => _day = v ?? 1),
-        ),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: TextField(controller: _startCtrl, decoration: const InputDecoration(labelText: 'Start (HH:MM)'))),
-          const SizedBox(width: 12),
-          Expanded(child: TextField(controller: _endCtrl, decoration: const InputDecoration(labelText: 'End (HH:MM)'))),
-        ]),
-        const SizedBox(height: 12),
-        TextField(controller: _durCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Slot length (minutes)')),
-        if (_error != null) ...[const SizedBox(height: 10), Text(_error!, style: TextStyle(color: c.danger))],
-        const SizedBox(height: 18),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _busy ? null : _save,
-            style: FilledButton.styleFrom(backgroundColor: c.primary, padding: const EdgeInsets.symmetric(vertical: 14)),
-            child: _busy
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Save slot', style: TextStyle(fontWeight: FontWeight.w700)),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Add availability slot',
+            style: TextStyle(
+              color: c.text,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+            ),
           ),
-        ),
-      ]),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<int>(
+            initialValue: _day,
+            decoration: const InputDecoration(labelText: 'Day of week'),
+            items: List.generate(
+              7,
+              (i) => DropdownMenuItem(value: i, child: Text(_days[i])),
+            ),
+            onChanged: (v) => setState(() => _day = v ?? 1),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _startCtrl,
+                  decoration: const InputDecoration(labelText: 'Start (HH:MM)'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _endCtrl,
+                  decoration: const InputDecoration(labelText: 'End (HH:MM)'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _durCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Slot length (minutes)',
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(_error!, style: TextStyle(color: c.danger)),
+          ],
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _busy ? null : _save,
+              style: FilledButton.styleFrom(
+                backgroundColor: c.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: _busy
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'Save slot',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

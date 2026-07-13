@@ -1,14 +1,14 @@
 import LegalLayout from './LegalLayout';
 
 /**
- * Public terms of service for the HayaatID / SehatID CNIC-linked digital health
+ * Public terms of service for the HayaatID digital health
  * card platform (Pakistan). Not lawyer-vetted — see the disclaimer in LegalLayout.
  */
 export default function TermsPage() {
   return (
     <LegalLayout title="Terms of Service">
       <p>
-        These Terms of Service (&ldquo;Terms&rdquo;) govern your use of the HayaatID / SehatID digital
+        These Terms of Service (&ldquo;Terms&rdquo;) govern your use of the HayaatID digital
         health-card platform (&ldquo;the Platform&rdquo;). By registering for or using the Platform you agree
         to these Terms. If you do not agree, do not use the Platform.
       </p>
@@ -40,7 +40,7 @@ export default function TermsPage() {
 
       <h2>2. Accounts and roles</h2>
       <p>
-        Accounts are linked to a CNIC and are assigned a role — patient, doctor, laboratory worker,
+        Accounts are assigned a unique 16-digit Hayaat ID and a role — patient, doctor, laboratory worker,
         receptionist, or administrator. Each role grants only the access appropriate to that role.
         You must provide accurate registration information and keep it up to date. Clinician and
         laboratory accounts may require verification and administrator approval before activation,

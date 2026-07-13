@@ -123,6 +123,9 @@ button { font-family: inherit; cursor: pointer; }
 .center { display: grid; place-items: center; padding: 60px; }
 .mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; }
 .section-title { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+.prescription-preview { position: relative; margin-bottom: 14px; padding: 18px 18px 16px 58px; border: 1px dashed #9fb8b8; border-radius: 10px; background: #fbfefe; line-height: 1.5; }
+.prescription-rx { position: absolute; left: 18px; top: 12px; font-family: Georgia, serif; font-size: 34px; color: var(--teal); }
+.prescription-signature { margin-top: 22px; padding-top: 10px; border-top: 1px solid var(--border); text-align: right; font-size: 13px; }
 
 /* ── Staff portal distinct identity: slate sidebar (admin uses teal) ───────── */
 .sidebar { background: #1f2a37; }

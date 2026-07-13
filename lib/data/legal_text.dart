@@ -10,7 +10,7 @@ class LegalText {
       'be relied upon as final legal advice.';
 
   static const String privacy = '''
-SehatID / HayaatID collects your CNIC, name, phone, email (optional), date of
+HayaatID collects your Hayaat ID, name, phone, email (optional), date of
 birth, gender, city, blood group, card photo, and your clinical records
 (visits, prescriptions, vitals, allergies, lab orders and results), along with
 appointments, in-app messages, and consent records.
@@ -52,7 +52,7 @@ This app is not for medical emergencies. In an emergency call 1122 or go to the
 nearest hospital. Messages to clinicians are not monitored in real time.
 
 ACCOUNTS AND ROLES
-One CNIC maps to one account. Keep your credentials secure; you are responsible
+One Hayaat ID maps to one account. Keep your credentials secure; you are responsible
 for activity under your account. Doctors register as pending and cannot use the
 service until an administrator approves them. Providing false identity or
 credential information is prohibited.

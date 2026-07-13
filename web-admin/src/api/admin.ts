@@ -46,7 +46,7 @@ export const adminApi = {
   async doctorApplications(status = 'pending'): Promise<DoctorApplication[]> {
     const data = await rows<Q>(
       supabase.from('doctor_profiles').select(
-        '*, profiles!id(id, full_name, cnic, email, phone_primary, status, created_at), clinics(name)',
+        '*, profiles!id(id, full_name, card_number, email, phone_primary, status, created_at), clinics(name)',
       ),
     );
     return data
@@ -54,7 +54,7 @@ export const adminApi = {
       .map((r) => ({
         id: r.profiles.id,
         full_name: r.profiles.full_name,
-        cnic: r.profiles.cnic,
+        card_number: r.profiles.card_number,
         email: r.profiles.email,
         phone_primary: r.profiles.phone_primary,
         status: r.profiles.status,
@@ -104,7 +104,7 @@ export const adminApi = {
     let query: Q = supabase.from('profiles').select('*').order('created_at', { ascending: false });
     if (filters.role) query = query.eq('role', filters.role);
     if (filters.status) query = query.eq('status', filters.status);
-    if (filters.q) query = query.or(`full_name.ilike.%${filters.q}%,cnic.ilike.%${filters.q}%`);
+    if (filters.q) query = query.or(`full_name.ilike.%${filters.q}%,card_number.ilike.%${filters.q.replace(/\s/g, '')}%`);
     return rows<Profile>(query);
   },
   async suspendUser(id: string, reason: string): Promise<void> {
@@ -144,7 +144,7 @@ export const adminApi = {
     const data = await rows<Q>(
       supabase
         .from('deletion_requests')
-        .select('*, profiles!user_id(full_name, cnic)')
+        .select('*, profiles!user_id(full_name, card_number)')
         .order('requested_at', { ascending: false }),
     );
     return data.map((r) => ({
@@ -157,7 +157,7 @@ export const adminApi = {
       processed_at: r.processed_at,
       processed_by: r.processed_by,
       full_name: r.profiles?.full_name ?? null,
-      cnic: r.profiles?.cnic ?? null,
+      card_number: r.profiles?.card_number ?? null,
     }));
   },
 
@@ -168,16 +168,58 @@ export const adminApi = {
    */
   async updateDeletionRequest(id: string, status: DeletionStatus, note: string): Promise<void> {
     const adminId = (await supabase.auth.getUser()).data.user?.id ?? null;
-    const { error } = await supabase
-      .from('deletion_requests')
-      .update({
-        status,
-        note: note.trim() || null,
-        processed_at: new Date().toISOString(),
-        processed_by: adminId,
-      })
-      .eq('id', id);
-    if (error) throw new Error(error.message);
+    const request = (await this.deletionRequests()).find((r) => r.id === id);
+    if (!request) throw new Error('Deletion request not found.');
+
+    if (status === 'completed') {
+      if (!request.user_id) throw new Error('This request is no longer linked to a user account.');
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      if (!token) throw new Error('You must be logged in as an admin.');
+
+      const { error: processingError } = await supabase.rpc('admin_mark_deletion_request', {
+        p_request_id: id,
+        p_status: 'processing',
+        p_note: note,
+      });
+      if (processingError) throw new Error(processingError.message);
+
+      const url = `${import.meta.env.VITE_SUPABASE_URL ?? 'https://iikwdtiqvxxatrzahuzo.supabase.co'}/functions/v1/delete-account`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ user_id: request.user_id, request_id: id, note }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const { error: failedMarkError } = await supabase.rpc('admin_mark_deletion_request', {
+          p_request_id: id,
+          p_status: 'failed',
+          p_note: json?.message ?? `Delete account failed: ${res.status}`,
+        });
+        if (failedMarkError) console.warn('Failed to mark deletion request failed', failedMarkError.message);
+        throw new Error(json?.message ?? `Delete account failed: ${res.status}`);
+      }
+      return;
+    }
+
+    const { error } = await supabase.rpc('admin_mark_deletion_request', {
+      p_request_id: id,
+      p_status: status,
+      p_note: note.trim() || null,
+    });
+    if (error) {
+      const { error: fallbackError } = await supabase
+        .from('deletion_requests')
+        .update({
+          status,
+          note: note.trim() || null,
+          processed_at: status === 'rejected' ? new Date().toISOString() : null,
+          processed_by: status === 'rejected' ? adminId : null,
+        })
+        .eq('id', id);
+      if (fallbackError) throw new Error(fallbackError.message);
+    }
   },
 
   /** Cards awaiting delivery (or optionally already delivered), joined to the owner profile. */
@@ -185,7 +227,7 @@ export const adminApi = {
     const data = await rows<Q>(
       supabase
         .from('cards')
-        .select('*, profiles!profile_id(full_name, cnic)')
+        .select('*, profiles!profile_id(full_name)')
         .in('status', statuses)
         .order('updated_at', { ascending: false }),
     );
@@ -200,7 +242,6 @@ export const adminApi = {
       delivery_fee_pkr: c.delivery_fee_pkr,
       updated_at: c.updated_at,
       full_name: c.profiles?.full_name ?? null,
-      cnic: c.profiles?.cnic ?? null,
     }));
   },
 

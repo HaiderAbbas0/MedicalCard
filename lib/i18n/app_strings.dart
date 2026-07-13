@@ -9,7 +9,7 @@ class AppStrings {
   static const Map<String, String> _en = {
     // Bottom navigation
     'nav.home': 'Home',
-    'nav.history': 'History',
+    'nav.history': 'Records',
     'nav.rx': 'Rx',
     'nav.reports': 'Reports',
     'nav.profile': 'Profile',
@@ -42,7 +42,7 @@ class AppStrings {
   static const Map<String, String> _ur = {
     // Bottom navigation
     'nav.home': 'ہوم',
-    'nav.history': 'تاریخ',
+    'nav.history': 'ریکارڈز',
     'nav.rx': 'نسخہ',
     'nav.reports': 'رپورٹس',
     'nav.profile': 'پروفائل',

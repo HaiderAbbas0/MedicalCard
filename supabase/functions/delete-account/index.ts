@@ -26,6 +26,29 @@ const cors = {
 const json = (status: number, obj: unknown) =>
   new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
+async function removeFolder(admin: ReturnType<typeof createClient>, bucket: string, userId: string) {
+  const { data, error } = await admin.storage.from(bucket).list(userId, { limit: 1000 });
+  if (error || !data?.length) return;
+  const paths = data.map((item) => `${userId}/${item.name}`);
+  await admin.storage.from(bucket).remove(paths);
+}
+
+async function markDeletionRequest(
+  admin: ReturnType<typeof createClient>,
+  requestId: string | null,
+  callerId: string,
+  status: 'processing' | 'completed' | 'failed',
+  note?: string,
+) {
+  if (!requestId) return;
+  await admin.from('deletion_requests').update({
+    status,
+    note: note ? note.slice(0, 1000) : null,
+    processed_at: status === 'completed' || status === 'failed' ? new Date().toISOString() : null,
+    processed_by: callerId,
+  }).eq('id', requestId);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
@@ -46,6 +69,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const targetId: string = (body?.user_id as string) || callerId;
+    const requestId: string | null = (body?.request_id as string) || null;
 
     // Authorization: you may delete yourself; only an admin may delete someone else.
     if (targetId !== callerId && callerRole !== 'admin') {
@@ -54,12 +78,28 @@ Deno.serve(async (req) => {
 
     const admin = createClient(url, service);
 
+    if (requestId && callerRole === 'admin') {
+      await markDeletionRequest(admin, requestId, callerId, 'processing');
+    }
+
+    await Promise.all([
+      removeFolder(admin, 'card-photos', targetId),
+      removeFolder(admin, 'lab-results', targetId),
+      removeFolder(admin, 'medical-documents', targetId),
+    ]);
+
     // Erase application data (cascades from profiles), then the auth identity.
     const { error: delProfErr } = await admin.from('profiles').delete().eq('id', targetId);
-    if (delProfErr) return json(400, { message: delProfErr.message });
+    if (delProfErr) {
+      await markDeletionRequest(admin, requestId, callerId, 'failed', delProfErr.message);
+      return json(400, { message: delProfErr.message });
+    }
 
     const { error: delAuthErr } = await admin.auth.admin.deleteUser(targetId);
-    if (delAuthErr) return json(400, { message: delAuthErr.message });
+    if (delAuthErr) {
+      await markDeletionRequest(admin, requestId, callerId, 'failed', delAuthErr.message);
+      return json(400, { message: delAuthErr.message });
+    }
 
     // Accountability record (survives the cascade — audit_logs has no FK to profiles).
     await admin.from('audit_logs').insert({
@@ -71,7 +111,9 @@ Deno.serve(async (req) => {
       patient_id: targetId,
       status: 'success',
     });
-
+    if (requestId && callerRole === 'admin') {
+      await markDeletionRequest(admin, requestId, callerId, 'completed');
+    }
     return json(200, { deleted: targetId });
   } catch (e) {
     return json(500, { message: String(e) });

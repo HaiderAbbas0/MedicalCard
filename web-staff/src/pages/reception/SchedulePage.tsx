@@ -3,15 +3,21 @@ import { receptionApi } from '../../api/reception';
 import type { ClinicAppointment, ClinicDoctor } from '../../api/types';
 import { Spinner, Empty, Modal, StatusBadge } from '../../components/ui';
 
+const localToday = () => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60_000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+};
+
 export default function SchedulePage() {
   const [appts, setAppts] = useState<ClinicAppointment[] | null>(null);
   const [error, setError] = useState('');
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(localToday);
   const [showBook, setShowBook] = useState(false);
 
   const load = useCallback(() => {
     setAppts(null);
-    receptionApi.appointments(date || undefined).then(setAppts).catch((e) => setError(e.message));
+    receptionApi.appointments(date).then(setAppts).catch((e) => setError(e.message));
   }, [date]);
 
   useEffect(load, [load]);
@@ -30,7 +36,7 @@ export default function SchedulePage() {
       <div className="toolbar between">
         <div className="row">
           <input type="date" className="input" style={{ maxWidth: 190 }} value={date} onChange={(e) => setDate(e.target.value)} />
-          {date && <button className="btn btn-ghost" onClick={() => setDate('')}>Clear</button>}
+          {date !== localToday() && <button className="btn btn-ghost" onClick={() => setDate(localToday())}>Today</button>}
         </div>
         <button className="btn btn-primary" onClick={() => setShowBook(true)}>+ New appointment</button>
       </div>
@@ -45,14 +51,14 @@ export default function SchedulePage() {
         ) : (
           <table className="table">
             <thead>
-              <tr><th>Time</th><th>Patient</th><th>CNIC</th><th>Doctor</th><th>Status</th><th /></tr>
+              <tr><th>Time</th><th>Patient</th><th>Hayaat ID</th><th>Doctor</th><th>Status</th><th /></tr>
             </thead>
             <tbody>
               {appts.map((a) => (
                 <tr key={a.id}>
                   <td>{a.appointment_date} · {a.appointment_time}</td>
                   <td>{a.patient?.full_name ?? '—'}</td>
-                  <td className="mono">{a.patient?.cnic ?? '—'}</td>
+                  <td className="mono">{a.patient?.card_number?.replace(/(\d{4})(?=\d)/g, '$1 ') ?? '—'}</td>
                   <td>{a.doctor_name ?? '—'}</td>
                   <td><StatusBadge status={a.status} /></td>
                   <td className="actions">
@@ -76,12 +82,13 @@ export default function SchedulePage() {
 }
 
 function BookModal({ onClose, onBooked }: { onClose: () => void; onBooked: () => void }) {
-  const [cnic, setCnic] = useState('');
+  const [hayaatId, setHayaatId] = useState('');
   const [patient, setPatient] = useState<{ id: string; full_name: string } | null>(null);
   const [doctors, setDoctors] = useState<ClinicDoctor[]>([]);
   const [doctorId, setDoctorId] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  const [slots, setSlots] = useState<{ slot_time: string; slot_label: string; clinic_id: string }[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -89,10 +96,21 @@ function BookModal({ onClose, onBooked }: { onClose: () => void; onBooked: () =>
     receptionApi.doctors().then((d) => { setDoctors(d); if (d[0]) setDoctorId(d[0].id); }).catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    setTime('');
+    setSlots([]);
+    if (!doctorId || !date) return;
+    receptionApi.availableSlots(doctorId, date)
+      .then(setSlots)
+      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load available slots.'));
+  }, [doctorId, date]);
+
   async function find() {
     setError('');
     try {
-      const p = await receptionApi.searchPatient(cnic.trim());
+      const digits = hayaatId.replace(/\D/g, '');
+      if (!/^\d{16}$/.test(digits)) return setError('Enter a valid 16-digit Hayaat ID.');
+      const p = await receptionApi.searchPatient(digits);
       setPatient(p);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Patient not found.');
@@ -101,6 +119,8 @@ function BookModal({ onClose, onBooked }: { onClose: () => void; onBooked: () =>
 
   async function book() {
     if (!patient || !doctorId || !date || !time) return setError('Find a patient and fill doctor, date, and time.');
+    const selected = new Date(`${date}T${time}`);
+    if (Number.isNaN(selected.getTime()) || selected <= new Date()) return setError('Appointment time must be in the future.');
     setBusy(true);
     setError('');
     try {
@@ -125,9 +145,10 @@ function BookModal({ onClose, onBooked }: { onClose: () => void; onBooked: () =>
       }
     >
       <div className="field">
-        <label>Patient CNIC</label>
+        <label>Patient Hayaat ID</label>
         <div className="row">
-          <input className="input" maxLength={13} value={cnic} onChange={(e) => setCnic(e.target.value.replace(/\D/g, ''))} />
+          <input className="input" inputMode="numeric" maxLength={19} placeholder="0000 0000 0000 0000" value={hayaatId}
+            onChange={(e) => setHayaatId(e.target.value.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim())} />
           <button className="btn btn-ghost" onClick={find}>Find</button>
         </div>
         {patient && <div style={{ color: 'var(--green)', fontSize: 13, marginTop: 6 }}>✓ {patient.full_name}</div>}
@@ -140,9 +161,13 @@ function BookModal({ onClose, onBooked }: { onClose: () => void; onBooked: () =>
       </div>
       <div className="row">
         <div className="field" style={{ flex: 1 }}><label>Date</label>
-          <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-        <div className="field" style={{ flex: 1 }}><label>Time</label>
-          <input type="time" className="input" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+          <input type="date" className="input" min={localToday()} value={date} onChange={(e) => setDate(e.target.value)} /></div>
+        <div className="field" style={{ flex: 1 }}><label>Open time</label>
+          <select className="select" value={time} onChange={(e) => setTime(e.target.value)} disabled={!date || slots.length === 0}>
+            <option value="">{date ? (slots.length ? 'Choose a time' : 'No open slots') : 'Choose date first'}</option>
+            {slots.map((s) => <option key={s.slot_time} value={s.slot_time}>{s.slot_label ?? s.slot_time}</option>)}
+          </select>
+        </div>
       </div>
       {error && <div className="error-text">{error}</div>}
     </Modal>

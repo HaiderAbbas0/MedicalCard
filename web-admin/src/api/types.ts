@@ -5,7 +5,7 @@ export type AccountStatus = 'active' | 'pending' | 'suspended' | 'rejected';
 
 export interface Profile {
   id: string;
-  cnic: string;
+  card_number: string;
   full_name: string;
   email: string | null;
   phone_primary: string;
@@ -24,7 +24,7 @@ export interface AuthResponse {
 export interface DoctorApplication {
   id: string;
   full_name: string;
-  cnic: string;
+  card_number: string;
   email: string | null;
   phone_primary: string;
   status: AccountStatus;
@@ -69,11 +69,11 @@ export interface DashboardStats {
   total_labs: number;
 }
 
-export type DeletionStatus = 'pending' | 'processing' | 'completed' | 'rejected';
+export type DeletionStatus = 'pending' | 'processing' | 'completed' | 'rejected' | 'failed';
 
 export interface DeletionRequest {
   id: string;
-  user_id: string;
+  user_id: string | null;
   reason: string | null;
   status: DeletionStatus;
   note: string | null;
@@ -81,7 +81,7 @@ export interface DeletionRequest {
   processed_at: string | null;
   processed_by: string | null;
   full_name: string | null;
-  cnic: string | null;
+  card_number: string | null;
 }
 
 export interface AppNotification {
@@ -108,7 +108,6 @@ export interface CardDelivery {
   delivery_fee_pkr: number | null;
   updated_at: string;
   full_name: string | null;
-  cnic: string | null;
 }
 
 export interface AuditEntry {

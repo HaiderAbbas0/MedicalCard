@@ -1,11 +1,21 @@
 // Lightweight models for the doctor / lab / receptionist clinical workflow.
 
 String _s(dynamic v) => v?.toString() ?? '';
+String formatHayaatId(String value) {
+  final digits = value.replaceAll(RegExp(r'\D'), '');
+  if (digits.length != 16) return value;
+  return [
+    digits.substring(0, 4),
+    digits.substring(4, 8),
+    digits.substring(8, 12),
+    digits.substring(12, 16),
+  ].join(' ');
+}
 
 class PatientSummary {
   final String id;
   final String fullName;
-  final String cnic;
+  final String cardNumber;
   final String? gender;
   final String? dateOfBirth;
   final String? bloodGroup;
@@ -15,7 +25,7 @@ class PatientSummary {
   PatientSummary({
     required this.id,
     required this.fullName,
-    required this.cnic,
+    required this.cardNumber,
     this.gender,
     this.dateOfBirth,
     this.bloodGroup,
@@ -24,15 +34,16 @@ class PatientSummary {
   });
 
   factory PatientSummary.fromJson(Map<String, dynamic> j) => PatientSummary(
-        id: _s(j['id']),
-        fullName: _s(j['full_name']),
-        cnic: _s(j['cnic']),
-        gender: j['gender'] as String?,
-        dateOfBirth: j['date_of_birth'] as String?,
-        bloodGroup: j['blood_group'] as String?,
-        allergies: ((j['allergies'] as List?) ?? []).cast<Map<String, dynamic>>(),
-        activeConditions: ((j['active_conditions'] as List?) ?? []).cast<Map<String, dynamic>>(),
-      );
+    id: _s(j['id']),
+    fullName: _s(j['full_name']),
+    cardNumber: _s(j['card_number']),
+    gender: j['gender'] as String?,
+    dateOfBirth: j['date_of_birth'] as String?,
+    bloodGroup: j['blood_group'] as String?,
+    allergies: ((j['allergies'] as List?) ?? []).cast<Map<String, dynamic>>(),
+    activeConditions: ((j['active_conditions'] as List?) ?? [])
+        .cast<Map<String, dynamic>>(),
+  );
 }
 
 class AppointmentModel {
@@ -58,19 +69,22 @@ class AppointmentModel {
     this.patient,
   });
 
-  String get patientName => patient?['full_name']?.toString() ?? patient?['display_name']?.toString() ?? '—';
+  String get patientName =>
+      patient?['full_name']?.toString() ??
+      patient?['display_name']?.toString() ??
+      '—';
 
   factory AppointmentModel.fromJson(Map<String, dynamic> j) => AppointmentModel(
-        id: _s(j['id']),
-        status: _s(j['status']),
-        date: _s(j['appointment_date']),
-        time: _s(j['appointment_time']),
-        type: _s(j['appointment_type']),
-        notesForDoctor: j['notes_for_doctor'] as String?,
-        doctorName: j['doctor_name'] as String?,
-        clinicName: j['clinic_name'] as String?,
-        patient: (j['patient'] as Map?)?.cast<String, dynamic>(),
-      );
+    id: _s(j['id']),
+    status: _s(j['status']),
+    date: _s(j['appointment_date']),
+    time: _s(j['appointment_time']),
+    type: _s(j['appointment_type']),
+    notesForDoctor: j['notes_for_doctor'] as String?,
+    doctorName: j['doctor_name'] as String?,
+    clinicName: j['clinic_name'] as String?,
+    patient: (j['patient'] as Map?)?.cast<String, dynamic>(),
+  );
 }
 
 class LabOrderModel {
@@ -93,12 +107,13 @@ class LabOrderModel {
   });
 
   factory LabOrderModel.fromJson(Map<String, dynamic> j) => LabOrderModel(
-        id: _s(j['id']),
-        testName: _s(j['test_name']),
-        priority: _s(j['priority']),
-        status: _s(j['status']),
-        clinicalIndication: j['clinical_indication'] as String?,
-        specialInstructions: j['special_instructions'] as String?,
-        patientDisplay: (j['patient'] as Map?)?['display_name']?.toString() ?? 'Patient',
-      );
+    id: _s(j['id']),
+    testName: _s(j['test_name']),
+    priority: _s(j['priority']),
+    status: _s(j['status']),
+    clinicalIndication: j['clinical_indication'] as String?,
+    specialInstructions: j['special_instructions'] as String?,
+    patientDisplay:
+        (j['patient'] as Map?)?['display_name']?.toString() ?? 'Patient',
+  );
 }
