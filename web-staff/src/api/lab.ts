@@ -74,4 +74,116 @@ export const labApi = {
     onProgress?.('Saving result metadata...');
     await this.uploadResult(id, { result_file_name: file.name, result_file_path: path, comments });
   },
+
+  async lookupPatient(identifier: string) {
+    const digits = identifier.replace(/\D/g, '');
+    if (digits.length !== 13 && digits.length !== 16) {
+      throw new Error('Enter a valid 16-digit Hayaat ID (or 13-digit CNIC).');
+    }
+    const { data, error } = await supabase.rpc('find_patient_by_identifier', { p_identifier: digits });
+    if (error) throw new Error(error.message);
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) throw new Error('Patient not found with this Hayaat ID / CNIC.');
+    return row as {
+      id: string;
+      cnic: string;
+      card_number: string;
+      full_name: string;
+      date_of_birth?: string;
+      gender?: string;
+      blood_group?: string;
+    };
+  },
+
+  async createDirectReport(params: {
+    patientId: string;
+    testName: string;
+    priority?: string;
+    indication?: string;
+    file: File;
+    comments?: string;
+    onProgress?: (msg: string) => void;
+  }) {
+    const lab = await myLab();
+    if (!lab) throw new Error('Your account is not linked to an active diagnostic lab.');
+    const { patientId, testName, priority = 'routine', indication, file, comments, onProgress } = params;
+    if (file.size <= 0) throw new Error(`${file.name} is empty.`);
+    if (file.size > MAX_RESULT_BYTES) throw new Error(`${file.name} is larger than 25 MB.`);
+    if (file.type && !ALLOWED_RESULT_TYPES.has(file.type) && !/\.(pdf|jpe?g|png)$/i.test(file.name)) {
+      throw new Error('Upload a PDF, JPG, or PNG result file.');
+    }
+
+    onProgress?.('Creating lab order...');
+    const { data: order, error: orderErr } = await supabase
+      .from('lab_orders')
+      .insert({
+        patient_id: patientId,
+        lab_id: lab,
+        test_name: testName.trim(),
+        priority,
+        clinical_indication: indication?.trim() || 'Direct walk-in report',
+        status: 'released_to_patient',
+        ordered_at: new Date().toISOString(),
+        sample_collected_at: new Date().toISOString(),
+        resulted_at: new Date().toISOString(),
+        released_to_patient_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+    if (orderErr) throw new Error(orderErr.message);
+
+    onProgress?.('Uploading file...');
+    const path = `${patientId}/${order.id}/${Date.now()}_${file.name}`;
+    const { error: upErr } = await supabase.storage.from('lab-results').upload(path, file, { upsert: true });
+    if (upErr) throw new Error(upErr.message);
+
+    onProgress?.('Saving result metadata...');
+    const { error: resErr } = await supabase.from('lab_results').insert({
+      lab_order_id: order.id,
+      lab_id: lab,
+      uploaded_by: await myId(),
+      patient_id: patientId,
+      result_file_name: file.name,
+      result_file_path: path,
+      comments: comments?.trim() || null,
+    });
+    if (resErr) throw new Error(resErr.message);
+
+    await supabase.from('notifications').insert({
+      recipient_id: patientId,
+      type: 'lab_result_ready',
+      title: 'Lab result released',
+      body: `Your lab result for ${testName} is now available.`,
+      resource_id: order.id,
+    });
+    return order.id;
+  },
+
+  async recentReports() {
+    const lab = await myLab();
+    if (!lab) return [];
+    const { data, error } = await supabase
+      .from('lab_orders')
+      .select('*, patient:profiles!patient_id(id, full_name, card_number), result:lab_results(result_file_name, comments)')
+      .eq('lab_id', lab)
+      .in('status', ['resulted', 'reviewed', 'released_to_patient', 'cancelled'])
+      .order('ordered_at', { ascending: false })
+      .limit(30);
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as Q[]).map((r) => ({
+      ...r,
+      result: Array.isArray(r.result) ? r.result[0] ?? null : r.result,
+    }));
+  },
+
+  async cancelReport(orderId: string, reason?: string) {
+    const { error } = await supabase
+      .from('lab_orders')
+      .update({
+        status: 'cancelled',
+        special_instructions: reason ? `Cancelled: ${reason}` : 'Cancelled by laboratory technician',
+      })
+      .eq('id', orderId);
+    if (error) throw new Error(error.message);
+  },
 };

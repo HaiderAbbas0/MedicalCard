@@ -146,12 +146,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 onChanged: (v) => setState(() => _isPatient = v),
               ),
               const SizedBox(height: 20),
-              _FieldLabel('CNIC, Hayaat ID, email, or phone'),
+              _FieldLabel(_isPatient ? 'Email or Hayaat ID' : 'Email (or Employee ID)'),
               const SizedBox(height: 8),
               _Field(
                 controller: _idCtrl,
-                icon: Icons.badge_outlined,
-                hint: '3520112345671',
+                icon: _isPatient ? Icons.credit_card_outlined : Icons.mail_outline_rounded,
+                hint: _isPatient
+                    ? 'name@example.com or 16-digit card number'
+                    : 'doctor@hayaat.id',
                 hasError: idEmpty,
                 onChanged: (_) {
                   if (_showError) setState(() => _showError = false);
@@ -184,7 +186,9 @@ class _LoginScreenState extends State<LoginScreen> {
               if (_showError) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Please enter your CNIC, Hayaat ID, email, or phone and password.',
+                  _isPatient
+                      ? 'Please enter your email or Hayaat ID and password.'
+                      : 'Please enter your email and password.',
                   style: AppText.caption.copyWith(color: c.danger),
                 ),
               ],
@@ -218,8 +222,8 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 18),
               _InfoBanner(
                 text: _isPatient
-                    ? 'Sign in with your 13-digit CNIC, your 16-digit Hayaat ID, email, or phone.'
-                    : 'Staff sign in with their CNIC, Hayaat ID, approved email, or Employee ID.',
+                    ? 'Sign in with your registered email or 16-digit Hayaat ID.'
+                    : 'Staff sign in with their registered email or employee ID.',
               ),
               const SizedBox(height: 24),
               Center(

@@ -39,7 +39,9 @@ String? get currentUid => db.auth.currentUser?.id;
 
 /// Resolve a login identifier (Hayaat ID / email / phone / employee ID).
 Future<String?> resolveLoginEmail(String identifier) async {
-  final res = await db.rpc('login_email', params: {'p_id': identifier.trim()});
+  final trimmed = identifier.trim();
+  if (trimmed.contains('@')) return trimmed.toLowerCase();
+  final res = await db.rpc('login_email', params: {'p_id': trimmed});
   return res as String?;
 }
 

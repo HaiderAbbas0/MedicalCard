@@ -113,6 +113,21 @@ export interface LabQueueOrder {
   patient?: { display_name: string } | null;
 }
 
+export interface LabRecentReport {
+  id: string;
+  test_name: string;
+  priority: string;
+  status: string;
+  ordered_at: string;
+  resulted_at?: string | null;
+  patient_id: string;
+  patient?: { id?: string; full_name?: string; card_number?: string } | null;
+  result?: {
+    result_file_name?: string | null;
+    comments?: string | null;
+  } | null;
+}
+
 // ── Receptionist ──────────────────────────────────────────────────────────────
 export interface ClinicAppointment {
   id: string;

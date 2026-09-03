@@ -32,8 +32,8 @@ export default function LoginPage() {
         <p className="sub" style={{ textAlign: 'center' }}>Doctors · Lab · Reception</p>
 
         <div className="field">
-          <label>CNIC, Hayaat ID, Employee ID, or Email</label>
-          <input className="input" value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoFocus />
+          <label>Email (or Employee ID)</label>
+          <input className="input" placeholder="e.g. demo.doctor@hayaat.id" value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoFocus />
         </div>
         <div className="field">
           <label>Password</label>
@@ -50,7 +50,7 @@ export default function LoginPage() {
           <a href="/register-doctor">Are you a doctor? Register here →</a>
         </p>
         <p className="muted" style={{ fontSize: 12, marginTop: 8, textAlign: 'center' }}>
-          Use your 13-digit CNIC, 16-digit Hayaat ID, employee ID, or approved email.
+          Use your registered email and password to sign in.
         </p>
         <p className="muted" style={{ fontSize: 12, marginTop: 8, textAlign: 'center' }}>
           <Link to="/legal/privacy">Privacy Policy</Link> · <Link to="/legal/terms">Terms of Service</Link>

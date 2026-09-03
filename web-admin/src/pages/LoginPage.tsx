@@ -32,8 +32,8 @@ export default function LoginPage() {
         <p className="sub" style={{ textAlign: 'center' }}>HayaatID Health Platform</p>
 
         <div className="field">
-          <label>CNIC, Hayaat ID, or Email</label>
-          <input className="input" value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoFocus />
+          <label>Email</label>
+          <input className="input" placeholder="admin@hayaat.id" value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoFocus />
         </div>
         <div className="field">
           <label>Password</label>
@@ -51,7 +51,7 @@ export default function LoginPage() {
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
         <p className="muted" style={{ fontSize: 12, marginTop: 16, textAlign: 'center' }}>
-          Authorized administrators only
+          Authorized administrators only. Sign in with your registered email.
         </p>
         <p className="muted" style={{ fontSize: 12, marginTop: 8, textAlign: 'center' }}>
           <Link to="/legal/privacy">Privacy Policy</Link> · <Link to="/legal/terms">Terms of Service</Link>

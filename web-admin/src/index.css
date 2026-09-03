@@ -86,6 +86,14 @@ button { font-family: inherit; cursor: pointer; }
 .sidebar .user-box { padding: 16px 22px 0; border-top: 1px solid rgba(255,255,255,0.12); margin-top: 12px; }
 .sidebar .user-box .name { color: #fff; font-weight: 600; }
 .sidebar .user-box small { color: #9fcaca; }
+.sidebar .user-box .btn-ghost {
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+}
+.sidebar .user-box .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
 
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .topbar { background: #fff; border-bottom: 1px solid var(--border); padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
