@@ -28,9 +28,11 @@ class NetworkException extends ApiException {
   NetworkException(super.message);
 }
 
-/// Authentication backed by Supabase Auth. Login uses Hayaat ID, email, or phone.
+/// Authentication backed by Supabase Auth. Login accepts the citizen's
+/// 13-digit CNIC, their 16-digit Hayaat ID, email, phone, or a staff
+/// employee ID — all resolved server-side by the `login_email` RPC.
 class AuthService {
-  /// Sign in with a 16-digit Hayaat ID, email, or phone + password.
+  /// Sign in with a CNIC, Hayaat ID, email, or phone + password.
   Future<AuthResponse> login(String identifier, String password) async {
     String? email;
     try {
@@ -72,6 +74,7 @@ class AuthService {
     required String name,
     required String email,
     required String password,
+    required String cnic,
     String? phone,
     String? dob,
     String? gender,
@@ -83,6 +86,10 @@ class AuthService {
     if (phone == null || phone.trim().length < 7) {
       throw BadRequestException('A valid phone number is required.');
     }
+    final cnicDigits = cnic.replaceAll(RegExp(r'\D'), '');
+    if (cnicDigits.length != 13) {
+      throw BadRequestException('CNIC must be exactly 13 digits.');
+    }
     final authEmail = email.trim().isNotEmpty
         ? email.trim().toLowerCase()
         : SupabaseConfig.emailFor(phone.replaceAll(RegExp(r'\D'), ''));
@@ -92,6 +99,7 @@ class AuthService {
         password: password,
         data: {
           'role': 'patient',
+          'cnic': cnicDigits,
           'full_name': name,
           'phone': phone.trim(),
           if (email.isNotEmpty) 'email': email,
@@ -121,6 +129,7 @@ class AuthService {
   Future<String> registerDoctor({
     required String fullName,
     required String password,
+    required String cnic,
     required String pmdcNumber,
     required String specialization,
     required String phone,
@@ -136,6 +145,10 @@ class AuthService {
   }) async {
     if (phone.trim().length < 7)
       throw BadRequestException('A valid phone number is required.');
+    final cnicDigits = cnic.replaceAll(RegExp(r'\D'), '');
+    if (cnicDigits.length != 13) {
+      throw BadRequestException('CNIC must be exactly 13 digits.');
+    }
     final authEmail = SupabaseConfig.emailFor(
       phone.replaceAll(RegExp(r'\D'), ''),
     );
@@ -145,6 +158,7 @@ class AuthService {
         password: password,
         data: {
           'role': 'doctor',
+          'cnic': cnicDigits,
           'full_name': fullName,
           'phone': phone.trim(),
           if (gender != null) 'gender': gender,
@@ -170,7 +184,7 @@ class AuthService {
   Future<void> sendPasswordReset(String identifier) async {
     final clean = identifier.trim();
     if (clean.isEmpty) {
-      throw BadRequestException('Enter your Hayaat ID, email, or phone first.');
+      throw BadRequestException('Enter your CNIC, Hayaat ID, email, or phone first.');
     }
     String? email;
     try {
@@ -217,7 +231,11 @@ class AuthService {
 
   String _friendly(String raw, {bool isPhone = false}) {
     final m = raw.toLowerCase();
-    if (m.contains('invalid login')) return 'Invalid Hayaat ID or password.';
+    if (m.contains('invalid login')) return 'Invalid CNIC or password.';
+    if (m.contains('cnic is already registered')) {
+      return 'An account is already registered with this CNIC.';
+    }
+    if (m.contains('cnic must be exactly')) return 'CNIC must be exactly 13 digits.';
     if (m.contains('already registered') || m.contains('already exists')) {
       return isPhone
           ? 'An account with this phone number already exists.'

@@ -195,7 +195,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
   }
 }
 
-/// Bottom sheet: search patient by Hayaat ID → pick doctor → date/time → book.
+/// Bottom sheet: search patient by CNIC → pick doctor → date/time → book.
 class _BookingSheet extends StatefulWidget {
   final ReceptionistService service;
   const _BookingSheet({required this.service});
@@ -205,7 +205,7 @@ class _BookingSheet extends StatefulWidget {
 }
 
 class _BookingSheetState extends State<_BookingSheet> {
-  final _hayaatIdCtrl = TextEditingController();
+  final _patientIdCtrl = TextEditingController();
   final _dateCtrl = TextEditingController();
   final _timeCtrl = TextEditingController();
   Map<String, dynamic>? _patient;
@@ -227,16 +227,17 @@ class _BookingSheetState extends State<_BookingSheet> {
 
   @override
   void dispose() {
-    _hayaatIdCtrl.dispose();
+    _patientIdCtrl.dispose();
     _dateCtrl.dispose();
     _timeCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _findPatient() async {
-    final digits = _hayaatIdCtrl.text.replaceAll(RegExp(r'\D'), '');
-    if (digits.length != 16) {
-      setState(() => _error = 'Enter a valid 16-digit Hayaat ID.');
+    final digits = _patientIdCtrl.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 13 && digits.length != 16) {
+      setState(
+          () => _error = 'Enter a 13-digit CNIC or a 16-digit Hayaat ID.');
       return;
     }
     setState(() {
@@ -311,11 +312,11 @@ class _BookingSheetState extends State<_BookingSheet> {
               children: [
                 Expanded(
                   child: TextField(
-                    controller: _hayaatIdCtrl,
+                    controller: _patientIdCtrl,
                     keyboardType: TextInputType.number,
                     maxLength: 16,
                     decoration: const InputDecoration(
-                      labelText: 'Patient Hayaat ID',
+                      labelText: 'Patient CNIC or Hayaat ID',
                       counterText: '',
                     ),
                   ),

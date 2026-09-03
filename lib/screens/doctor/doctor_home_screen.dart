@@ -11,7 +11,7 @@ import 'doctor_lab_review_screen.dart';
 import 'doctor_availability_screen.dart';
 import 'doctor_profile_screen.dart';
 
-/// Doctor home — today's appointments + patient search by Hayaat ID.
+/// Doctor home — today's appointments + patient search by CNIC (P-FR-019).
 class DoctorHomeScreen extends StatefulWidget {
   const DoctorHomeScreen({super.key});
 
@@ -33,16 +33,18 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
   void _reload() => setState(() => _future = _service.appointments());
 
   Future<void> _searchPatient() async {
-    final hayaatId = await showDialog<String>(
+    final identifier = await showDialog<String>(
       context: context,
-      builder: (_) => const _HayaatIdSearchDialog(),
+      builder: (_) => const _PatientSearchDialog(),
     );
-    if (hayaatId == null || hayaatId.isEmpty) return;
-    final digits = hayaatId.replaceAll(RegExp(r'\D'), '');
-    if (digits.length != 16) {
+    if (identifier == null || identifier.isEmpty) return;
+    final digits = identifier.replaceAll(RegExp(r'\D'), '');
+    // 13 digits = CNIC (the usual case at the desk); 16 = Hayaat card number.
+    if (digits.length != 13 && digits.length != 16) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter a valid 16-digit Hayaat ID.')),
+          const SnackBar(
+              content: Text('Enter a 13-digit CNIC or a 16-digit Hayaat ID.')),
         );
       return;
     }
@@ -320,13 +322,13 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-class _HayaatIdSearchDialog extends StatefulWidget {
-  const _HayaatIdSearchDialog();
+class _PatientSearchDialog extends StatefulWidget {
+  const _PatientSearchDialog();
   @override
-  State<_HayaatIdSearchDialog> createState() => _HayaatIdSearchDialogState();
+  State<_PatientSearchDialog> createState() => _PatientSearchDialogState();
 }
 
-class _HayaatIdSearchDialogState extends State<_HayaatIdSearchDialog> {
+class _PatientSearchDialogState extends State<_PatientSearchDialog> {
   final _ctrl = TextEditingController();
   @override
   void dispose() {
@@ -337,12 +339,14 @@ class _HayaatIdSearchDialogState extends State<_HayaatIdSearchDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Search patient by Hayaat ID'),
+      title: const Text('Search patient by CNIC'),
       content: TextField(
         controller: _ctrl,
         keyboardType: TextInputType.number,
         autofocus: true,
-        decoration: const InputDecoration(hintText: '16-digit Hayaat ID'),
+        decoration: const InputDecoration(
+          hintText: '13-digit CNIC (or 16-digit Hayaat ID)',
+        ),
       ),
       actions: [
         TextButton(

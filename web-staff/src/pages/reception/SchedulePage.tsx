@@ -82,7 +82,7 @@ export default function SchedulePage() {
 }
 
 function BookModal({ onClose, onBooked }: { onClose: () => void; onBooked: () => void }) {
-  const [hayaatId, setHayaatId] = useState('');
+  const [patientIdentifier, setPatientIdentifier] = useState('');
   const [patient, setPatient] = useState<{ id: string; full_name: string } | null>(null);
   const [doctors, setDoctors] = useState<ClinicDoctor[]>([]);
   const [doctorId, setDoctorId] = useState('');
@@ -108,8 +108,10 @@ function BookModal({ onClose, onBooked }: { onClose: () => void; onBooked: () =>
   async function find() {
     setError('');
     try {
-      const digits = hayaatId.replace(/\D/g, '');
-      if (!/^\d{16}$/.test(digits)) return setError('Enter a valid 16-digit Hayaat ID.');
+      const digits = patientIdentifier.replace(/\D/g, '');
+      if (!/^\d{13}$/.test(digits) && !/^\d{16}$/.test(digits)) {
+        return setError('Enter a 13-digit CNIC or a 16-digit Hayaat ID.');
+      }
       const p = await receptionApi.searchPatient(digits);
       setPatient(p);
     } catch (e) {
@@ -145,10 +147,11 @@ function BookModal({ onClose, onBooked }: { onClose: () => void; onBooked: () =>
       }
     >
       <div className="field">
-        <label>Patient Hayaat ID</label>
+        <label>Patient CNIC</label>
         <div className="row">
-          <input className="input" inputMode="numeric" maxLength={19} placeholder="0000 0000 0000 0000" value={hayaatId}
-            onChange={(e) => setHayaatId(e.target.value.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim())} />
+          <input className="input" inputMode="numeric" maxLength={16}
+            placeholder="13-digit CNIC (or 16-digit Hayaat ID)" value={patientIdentifier}
+            onChange={(e) => setPatientIdentifier(e.target.value.replace(/\D/g, '').slice(0, 16))} />
           <button className="btn btn-ghost" onClick={find}>Find</button>
         </div>
         {patient && <div style={{ color: 'var(--green)', fontSize: 13, marginTop: 6 }}>✓ {patient.full_name}</div>}

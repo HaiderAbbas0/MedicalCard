@@ -69,7 +69,8 @@ create policy p_cards_upd on public.cards for update to authenticated using (pro
 -- Issue or update the caller's card (atomic; assigns the next number on first issue).
 drop function if exists public.request_card(text, date, text, text, text);
 drop function if exists public.request_card(text, text, date, text, text, text);
-create or replace function public.request_card(
+
+create function public.request_card(
   p_name_en text default null,
   p_name_ur text default null,
   p_dob date default null,
@@ -77,34 +78,65 @@ create or replace function public.request_card(
   p_city text default null,
   p_photo_url text default null)
   returns public.cards language plpgsql security definer set search_path = public as
-$$
-declare v_role text; v_name text; v_num text; v_card public.cards;
+$fn$
+declare
+  v_role text;
+  v_name text;
+  v_num text;
+  v_card public.cards;
 begin
-  select role, full_name into v_role, v_name from public.profiles where id = auth.uid();
+  select role, full_name, card_number into v_role, v_name, v_num
+    from public.profiles where id = auth.uid();
   if v_role is null then raise exception 'Profile not found.'; end if;
+
+  -- Reuse the number issued at sign-up. Only mint one if the account somehow
+  -- has none (rows created before card numbers existed).
+  if v_num is null or v_num !~ '^[0-9]{16}$' then
+    v_num := public.gen_hayaat_id();
+  end if;
 
   select * into v_card from public.cards where profile_id = auth.uid();
   if v_card.id is null then
-    v_num := public.gen_card_number(v_role);
-    insert into public.cards (profile_id, card_number, role, name_en, name_ur, date_of_birth, blood_group, city, photo_url, status)
-      values (auth.uid(), v_num, v_role, coalesce(nullif(p_name_en, ''), v_name), p_name_ur, p_dob, p_blood_group, p_city, p_photo_url, 'virtual')
-      returning * into v_card;
-    update public.profiles set card_number = v_num, date_of_birth = coalesce(date_of_birth, p_dob) where id = auth.uid();
+    insert into public.cards
+      (profile_id, card_number, role, name_en, name_ur, date_of_birth,
+       blood_group, city, photo_url, status)
+    values
+      (auth.uid(), v_num, v_role, coalesce(nullif(p_name_en, ''), v_name),
+       p_name_ur, p_dob, p_blood_group, p_city, p_photo_url, 'virtual')
+    returning * into v_card;
   else
     update public.cards set
-      name_en = coalesce(nullif(p_name_en, ''), name_en),
-      name_ur = p_name_ur, date_of_birth = p_dob, blood_group = p_blood_group, city = p_city,
-      photo_url = coalesce(p_photo_url, photo_url), updated_at = now()
-    where profile_id = auth.uid() returning * into v_card;
+      card_number   = v_num,
+      name_en       = coalesce(nullif(p_name_en, ''), name_en),
+      name_ur       = p_name_ur,
+      date_of_birth = p_dob,
+      blood_group   = p_blood_group,
+      city          = p_city,
+      photo_url     = coalesce(p_photo_url, photo_url),
+      updated_at    = now()
+    where profile_id = auth.uid()
+    returning * into v_card;
   end if;
 
-  -- Keep the patient profile in sync.
-  update public.patient_profiles set blood_group = p_blood_group, address_city = p_city where id = auth.uid();
+  -- Keep all three copies of the number, and the demographics, in step.
+  update public.profiles
+     set card_number   = v_num,
+         date_of_birth = coalesce(date_of_birth, p_dob)
+   where id = auth.uid();
+
+  update public.patient_profiles
+     set blood_group        = coalesce(p_blood_group, blood_group),
+         address_city       = coalesce(p_city, address_city),
+         health_card_number = v_num
+   where id = auth.uid();
+
   return v_card;
 end;
-$$;
+$fn$;
 
--- Request a physical card (delivery details + status).
+revoke all on function public.request_card(text, text, date, text, text, text) from public;
+grant execute on function public.request_card(text, text, date, text, text, text) to authenticated;
+
 create or replace function public.request_physical_card(p_address text, p_phone text)
   returns public.cards language plpgsql security definer set search_path = public as
 $$

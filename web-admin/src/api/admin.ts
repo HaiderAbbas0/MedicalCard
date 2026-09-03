@@ -46,7 +46,7 @@ export const adminApi = {
   async doctorApplications(status = 'pending'): Promise<DoctorApplication[]> {
     const data = await rows<Q>(
       supabase.from('doctor_profiles').select(
-        '*, profiles!id(id, full_name, card_number, email, phone_primary, status, created_at), clinics(name)',
+        '*, profiles!id(id, full_name, cnic, card_number, email, phone_primary, status, created_at), clinics(name)',
       ),
     );
     return data
@@ -54,6 +54,7 @@ export const adminApi = {
       .map((r) => ({
         id: r.profiles.id,
         full_name: r.profiles.full_name,
+        cnic: r.profiles.cnic,
         card_number: r.profiles.card_number,
         email: r.profiles.email,
         phone_primary: r.profiles.phone_primary,
@@ -104,7 +105,14 @@ export const adminApi = {
     let query: Q = supabase.from('profiles').select('*').order('created_at', { ascending: false });
     if (filters.role) query = query.eq('role', filters.role);
     if (filters.status) query = query.eq('status', filters.status);
-    if (filters.q) query = query.or(`full_name.ilike.%${filters.q}%,card_number.ilike.%${filters.q.replace(/\s/g, '')}%`);
+    if (filters.q) {
+      // Search by name, CNIC, or Hayaat number. Digits are stripped so a CNIC
+      // typed with dashes still matches the stored 13-digit value.
+      const digits = filters.q.replace(/\D/g, '');
+      const clauses = [`full_name.ilike.%${filters.q}%`];
+      if (digits) clauses.push(`cnic.ilike.%${digits}%`, `card_number.ilike.%${digits}%`);
+      query = query.or(clauses.join(','));
+    }
     return rows<Profile>(query);
   },
   async suspendUser(id: string, reason: string): Promise<void> {

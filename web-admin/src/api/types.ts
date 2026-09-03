@@ -5,6 +5,9 @@ export type AccountStatus = 'active' | 'pending' | 'suspended' | 'rejected';
 
 export interface Profile {
   id: string;
+  /** 13-digit CNIC — citizen identity (P-FR-001/005). */
+  cnic: string | null;
+  /** 16-digit Hayaat number printed on the health card. */
   card_number: string;
   full_name: string;
   email: string | null;
@@ -24,6 +27,7 @@ export interface AuthResponse {
 export interface DoctorApplication {
   id: string;
   full_name: string;
+  cnic: string | null;
   card_number: string;
   email: string | null;
   phone_primary: string;

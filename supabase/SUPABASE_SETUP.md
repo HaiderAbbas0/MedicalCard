@@ -18,8 +18,23 @@ Supabase dashboard → **SQL Editor** → **New query**. Paste and **Run** each 
 9. [`perf_indexes.sql`](./perf_indexes.sql) — query and RLS indexes
 10. [`product_hardening.sql`](./product_hardening.sql) — scheduling constraints, prescription footer fields, email login, and double-booking prevention
 11. [`remove_demo_data.sql`](./remove_demo_data.sql) — removes legacy fixed demo identities if this project was previously seeded
-12. [`hayaat_id_only.sql`](./hayaat_id_only.sql) — replaces all legacy identifiers with unique 16-digit numeric Hayaat IDs and removes the `cnic` column
+12. [`hayaat_id_only.sql`](./hayaat_id_only.sql) — issues every account a unique 16-digit numeric Hayaat ID (the number printed on the health card)
 13. [`patient_records.sql`](./patient_records.sql) — specialty record library, durable lab file paths, generic documents, and secure original-file storage
+14. [`cnic_identity.sql`](./cnic_identity.sql) — **restores the 13-digit CNIC as the citizen identity** (P-FR-001/002/005/019): `profiles.cnic` with a uniqueness guarantee, CNIC accepted at login, and `find_patient_by_identifier()` for staff patient lookup. `hayaat_id_only.sql` had dropped the column; this puts it back **without** removing the Hayaat card number — the two coexist.
+15. [`clinical_narrative_rls.sql`](./clinical_narrative_rls.sql) — keeps the consultation narrative (encounters, diagnoses, prescriptions, vitals, allergies) away from lab workers and receptionists
+16. [`card_number_consistency.sql`](./card_number_consistency.sql) — one Hayaat number per patient: `request_card()` reuses the number issued at sign-up instead of minting a new one, and `profiles` / `cards` / `patient_profiles` are reconciled
+17. [`demo_seed.sql`](./demo_seed.sql) — optional. Demo clinic, laboratory, and staff roles for the six demo accounts. Run `node ../tests/seed_demo_accounts.mjs` first.
+
+Files 1-17 are also mirrored as timestamped migrations under
+[`migrations/`](./migrations), so `supabase db push` can apply them to a linked
+project instead of pasting into the SQL editor.
+
+### Already have a deployed project?
+
+`FINALIZE.sql` bundles everything that was verified missing from the live
+project into one paste: the booking RPCs, the corrected `request_card()`
+signature, `cnic_identity.sql`, and `demo_seed.sql`. Run that instead of
+replaying the list above.
 
 > Order matters: `security.sql` re-defines policies created by `schema.sql`, and
 > `security_hardening.sql` re-defines `is_staff()` from `security.sql` — so run

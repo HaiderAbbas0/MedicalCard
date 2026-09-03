@@ -45,7 +45,14 @@ const createdIds = {
 
 const stamp = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
 const emailFor = (role) => `rls-${role}-${stamp}@hayaat.test`;
-const cardFor = (prefix, offset) => `${prefix}${String(stamp).slice(-11).padStart(11, '0')}${String(offset).padStart(4, '0')}`.slice(0, 16);
+// Hayaat card numbers carry a Luhn check digit that `profiles_hayaat_id_format`
+// enforces, so a fabricated 16-digit string is rejected. Ask the database to
+// mint one instead of inventing it here.
+async function newCardNumber() {
+  const { data, error } = await admin.rpc('gen_hayaat_id');
+  if (error) throw new Error(`gen_hayaat_id: ${error.message}`);
+  return data;
+}
 const isRlsDenied = (error) => !!error && (error.code === '42501' || /row-level security/i.test(error.message || ''));
 
 function ok(name) {
@@ -68,6 +75,7 @@ function authedClient() {
 
 async function createUser({ role, name, cardNumber, status = 'active', extraProfile = {} }) {
   const email = emailFor(`${role}-${createdUserIds.length}`);
+  cardNumber = cardNumber ?? (await newCardNumber());
   const { data, error } = await admin.auth.admin.createUser({
     email,
     password: PASSWORD,
@@ -89,7 +97,10 @@ async function createUser({ role, name, cardNumber, status = 'active', extraProf
     auth_user_id: id,
     full_name: name,
     email,
-    phone_primary: `03${String(stamp).slice(-8)}${String(createdUserIds.length).padStart(2, '0')}`.slice(0, 11),
+    // Exactly 11 digits and unique per user: 03 + 7 stamp digits + 2 index
+    // digits. Truncating a longer string collided once profiles gained a
+    // unique-phone constraint, because the index digits were cut off.
+    phone_primary: `03${String(stamp).slice(-7).padStart(7, '0')}${String(createdUserIds.length % 100).padStart(2, '0')}`,
     card_number: cardNumber,
     role,
     status,
@@ -121,13 +132,13 @@ async function seed() {
   if (labError) throw new Error(`create lab: ${labError.message}`);
   createdIds.labs.push(lab.id);
 
-  const patientA = await createUser({ role: 'patient', name: 'RLS Patient A', cardNumber: cardFor('1', 1) });
-  const patientB = await createUser({ role: 'patient', name: 'RLS Patient B', cardNumber: cardFor('1', 2) });
-  const doctor = await createUser({ role: 'doctor', name: 'RLS Doctor', cardNumber: cardFor('2', 1) });
-  const pendingDoctor = await createUser({ role: 'doctor', name: 'RLS Pending Doctor', cardNumber: cardFor('2', 2), status: 'pending' });
-  const receptionist = await createUser({ role: 'receptionist', name: 'RLS Receptionist', cardNumber: cardFor('3', 1) });
-  const labWorker = await createUser({ role: 'lab_worker', name: 'RLS Lab Worker', cardNumber: cardFor('4', 1) });
-  const adminUser = await createUser({ role: 'admin', name: 'RLS Admin', cardNumber: cardFor('9', 1) });
+  const patientA = await createUser({ role: 'patient', name: 'RLS Patient A' });
+  const patientB = await createUser({ role: 'patient', name: 'RLS Patient B' });
+  const doctor = await createUser({ role: 'doctor', name: 'RLS Doctor' });
+  const pendingDoctor = await createUser({ role: 'doctor', name: 'RLS Pending Doctor', status: 'pending' });
+  const receptionist = await createUser({ role: 'receptionist', name: 'RLS Receptionist' });
+  const labWorker = await createUser({ role: 'lab_worker', name: 'RLS Lab Worker' });
+  const adminUser = await createUser({ role: 'admin', name: 'RLS Admin' });
 
   await requireOk(admin.from('patient_profiles').upsert([
     { id: patientA.id, health_card_number: patientA.id },
@@ -238,7 +249,7 @@ async function runChecks(ctx) {
 
   const { data: ownProfile } = await ctx.patientA.client.from('profiles').select('id,card_number').eq('id', ctx.patientA.id);
   check('patient can read own profile', (ownProfile ?? []).length === 1);
-  check('patient profile uses Hayaat ID/card number, not CNIC', /^\d{12,16}$/.test(ownProfile?.[0]?.card_number ?? ''), ownProfile?.[0]?.card_number);
+  check('patient profile carries a numeric Hayaat card number', /^\d{12,16}$/.test(ownProfile?.[0]?.card_number ?? ''), ownProfile?.[0]?.card_number);
 
   const { data: otherProfile } = await ctx.patientA.client.from('profiles').select('id').eq('id', ctx.patientB.id);
   check('patient cannot read another patient profile', (otherProfile ?? []).length === 0, `got ${(otherProfile ?? []).length}`);

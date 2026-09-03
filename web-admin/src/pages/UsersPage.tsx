@@ -62,7 +62,7 @@ export default function UsersPage() {
         <input
           className="input"
           style={{ maxWidth: 280 }}
-          placeholder="Search by name or Hayaat ID…"
+          placeholder="Search by name, CNIC, or Hayaat ID…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && load()}
@@ -87,6 +87,7 @@ export default function UsersPage() {
             <thead>
               <tr>
                 <th>Name</th>
+                <th>CNIC</th>
                 <th>Hayaat ID</th>
                 <th>Role</th>
                 <th>Status</th>
@@ -98,6 +99,7 @@ export default function UsersPage() {
               {users.map((u) => (
                 <tr key={u.id}>
                   <td>{u.full_name}</td>
+                  <td className="mono">{u.cnic ?? '—'}</td>
                   <td className="mono">{u.card_number?.replace(/(\d{4})(?=\d)/g, '$1 ')}</td>
                   <td>{u.role}</td>
                   <td><StatusBadge status={u.status} /></td>

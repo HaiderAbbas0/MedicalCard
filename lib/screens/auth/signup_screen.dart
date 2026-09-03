@@ -21,6 +21,7 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _name = TextEditingController();
+  final _cnic = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _emergency = TextEditingController();
@@ -33,16 +34,26 @@ class _SignupScreenState extends State<SignupScreen> {
   // Validation error messages (shown inline)
   String? _phoneError;
   String? _emailError;
+  String? _cnicError;
 
   @override
   void dispose() {
-    for (final c in [_name, _email, _phone, _emergency, _pw]) {
+    for (final c in [_name, _cnic, _email, _phone, _emergency, _pw]) {
       c.dispose();
     }
     super.dispose();
   }
 
   // ── Validators ──────────────────────────────────────────────────────────────
+
+  /// CNIC must be exactly 13 digits (P-FR-001). Dashes are accepted on input
+  /// and stripped before the value reaches Supabase.
+  String? _validateCnic(String val) {
+    final digits = val.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return null; // required check handled by _enabled
+    if (digits.length != 13) return 'CNIC must be exactly 13 digits.';
+    return null;
+  }
 
   /// Phone must be exactly 11 digits (Pakistani mobile format).
   String? _validatePhone(String val) {
@@ -73,6 +84,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool get _enabled {
     return _name.text.trim().isNotEmpty &&
+        _cnic.text.trim().isNotEmpty &&
         _phone.text.trim().isNotEmpty &&
         _pw.text.isNotEmpty &&
         _dob != null &&
@@ -93,13 +105,15 @@ class _SignupScreenState extends State<SignupScreen> {
   // ── Submit: validate → check Supabase → navigate to OTP ────────────────────
   Future<void> _submit() async {
     // Run validators
+    final cnicErr = _validateCnic(_cnic.text);
     final phoneErr = _validatePhone(_phone.text);
     final emailErr = _validateEmail(_email.text);
     setState(() {
+      _cnicError = cnicErr;
       _phoneError = phoneErr;
       _emailError = emailErr;
     });
-    if (phoneErr != null || emailErr != null) return;
+    if (cnicErr != null || phoneErr != null || emailErr != null) return;
 
     final pwErr = _validatePassword(_pw.text);
     if (pwErr != null) {
@@ -113,17 +127,26 @@ class _SignupScreenState extends State<SignupScreen> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
-      // Check Supabase for an existing user with the same phone number.
+      // P-FR-005 — the same CNIC may not be registered twice, for any role.
+      // The database enforces this with a unique index; checking here just
+      // gives the person a clear message before they sit through the OTP step.
+      final cnic = _cnic.text.replaceAll(RegExp(r'\D'), '');
       final phone = _phone.text.replaceAll(RegExp(r'\D'), '');
-      final existing = await db
-          .from('profiles')
-          .select('id')
-          .eq('phone_primary', phone)
-          .maybeSingle();
 
+      final cnicTaken = await resolveLoginEmail(cnic);
       if (!mounted) return;
+      if (cnicTaken != null) {
+        messenger.showSnackBar(SnackBar(
+          content: const Text('An account is already registered with this CNIC.'),
+          backgroundColor: Colors.red[800],
+        ));
+        setState(() => _busy = false);
+        return;
+      }
 
-      if (existing != null) {
+      final phoneTaken = await resolveLoginEmail(phone);
+      if (!mounted) return;
+      if (phoneTaken != null) {
         messenger.showSnackBar(SnackBar(
           content: const Text('A user with this phone number already exists.'),
           backgroundColor: Colors.red[800],
@@ -135,6 +158,7 @@ class _SignupScreenState extends State<SignupScreen> {
       // Bundle form data and hand off to OTP screen — no Supabase write yet.
       final pendingData = {
         'name': _name.text.trim(),
+        'cnic': cnic,
         'email': _email.text.trim(),
         'phone': phone,
         'password': _pw.text,
@@ -196,6 +220,18 @@ class _SignupScreenState extends State<SignupScreen> {
 
               _label('Full name'),
               _field(_name, 'e.g. Ayesha Khan'),
+              const SizedBox(height: 14),
+
+              _label('CNIC'),
+              _field(_cnic, '13 digits, e.g. 3520112345671',
+                  keyboard: TextInputType.number,
+                  formatters: [FilteringTextInputFormatter.digitsOnly],
+                  maxLength: 13),
+              if (_cnicError != null) ...[
+                const SizedBox(height: 6),
+                Text(_cnicError!,
+                    style: AppText.caption.copyWith(color: c.danger)),
+              ],
               const SizedBox(height: 14),
 
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

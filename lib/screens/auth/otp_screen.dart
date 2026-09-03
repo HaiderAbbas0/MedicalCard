@@ -106,6 +106,7 @@ class _OtpScreenState extends State<OtpScreen> {
         final ok = await context.read<AuthController>().signUp(
           name: data['name'] as String,
           email: data['email'] as String? ?? '',
+          cnic: data['cnic'] as String,
           phone: data['phone'] as String,
           password: data['password'] as String,
           gender: data['gender'] as String?,

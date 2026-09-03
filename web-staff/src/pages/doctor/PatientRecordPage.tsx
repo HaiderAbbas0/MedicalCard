@@ -45,7 +45,7 @@ export default function PatientRecordPage() {
       <div className="card card-pad">
         <h2 style={{ margin: 0 }}>{patient.full_name}</h2>
         <p className="muted" style={{ marginTop: 4 }}>
-          Hayaat ID {patient.card_number?.replace(/(\d{4})(?=\d)/g, '$1 ')} · {patient.gender ?? '—'} · DOB {patient.date_of_birth ?? '—'} · Blood {patient.blood_group ?? '—'}
+          CNIC {patient.cnic ?? '—'} · Hayaat ID {patient.card_number?.replace(/(\d{4})(?=\d)/g, '$1 ')} · {patient.gender ?? '—'} · DOB {patient.date_of_birth ?? '—'} · Blood {patient.blood_group ?? '—'}
         </p>
         {allergies.length > 0 && (
           <div style={{ background: 'var(--red-bg)', color: 'var(--red)', padding: '10px 14px', borderRadius: 8, marginTop: 10 }}>

@@ -32,7 +32,7 @@ export default function LoginPage() {
         <p className="sub" style={{ textAlign: 'center' }}>HayaatID Health Platform</p>
 
         <div className="field">
-          <label>Hayaat ID or Email</label>
+          <label>CNIC, Hayaat ID, or Email</label>
           <input className="input" value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoFocus />
         </div>
         <div className="field">

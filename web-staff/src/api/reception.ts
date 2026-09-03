@@ -36,16 +36,23 @@ export const receptionApi = {
       .map((r) => ({ id: r.id, full_name: r.profiles?.full_name ?? '', specialization_primary: r.specialization_primary ?? '' }));
   },
 
+  /** Front-desk lookup by 13-digit CNIC or 16-digit Hayaat ID. Uses the same
+   *  staff-only RPC as the doctor, so demographics are available for booking
+   *  without granting the receptionist a blanket read over `profiles`. */
   async searchPatient(identifier: string) {
-    const base = supabase
-      .from('profiles')
-      .select('id, full_name, card_number, phone_primary')
-      .eq('role', 'patient');
-    const query = base.eq('card_number', identifier.replace(/\D/g, ''));
-    const { data, error } = await query.maybeSingle();
+    const digits = identifier.replace(/\D/g, '');
+    if (digits.length !== 13 && digits.length !== 16) {
+      throw new Error('Enter a 13-digit CNIC or a 16-digit Hayaat ID.');
+    }
+    const { data, error } = await supabase.rpc('find_patient_by_identifier', { p_identifier: digits });
     if (error) throw new Error(error.message);
-    if (!data) throw new Error('No patient found with that Hayaat ID.');
-    return data;
+    const patient = (data ?? [])[0];
+    if (!patient) {
+      throw new Error(digits.length === 13
+        ? 'No patient is registered with that CNIC.'
+        : 'No patient found with that Hayaat ID.');
+    }
+    return patient;
   },
 
   async book(body: Record<string, unknown>) {

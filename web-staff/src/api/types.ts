@@ -5,6 +5,9 @@ export type AccountStatus = 'active' | 'pending' | 'suspended' | 'rejected';
 
 export interface Profile {
   id: string;
+  /** 13-digit CNIC — citizen identity used for login and staff lookup. */
+  cnic: string | null;
+  /** 16-digit Hayaat number printed on the health card. */
   card_number: string;
   full_name: string;
   email: string | null;
@@ -35,6 +38,7 @@ export interface Appointment {
 export interface PatientSummary {
   id: string;
   full_name: string;
+  cnic: string | null;
   card_number: string;
   gender?: string;
   date_of_birth?: string;

@@ -40,7 +40,8 @@ class UserModel {
   final String name;
   final String email;
   final String? phone;
-  final String? cardNumber; // 16-digit Hayaat ID
+  final String? cnic; // 13-digit CNIC — citizen identity (P-FR-001)
+  final String? cardNumber; // 16-digit Hayaat ID — number on the health card
   final UserRole role;
   final String? status;
   final String? healthId;
@@ -56,6 +57,7 @@ class UserModel {
     required this.name,
     required this.email,
     this.phone,
+    this.cnic,
     this.cardNumber,
     this.role = UserRole.patient,
     this.status,
@@ -75,6 +77,7 @@ class UserModel {
       name: (json['full_name'] ?? json['name'] ?? '') as String,
       email: (json['email'] ?? '') as String,
       phone: (json['phone_primary'] ?? json['phone']) as String?,
+      cnic: json['cnic'] as String?,
       cardNumber: json['card_number'] as String?,
       role: roleFromString(json['role'] as String?),
       status: json['status'] as String?,
@@ -91,6 +94,7 @@ class UserModel {
     'full_name': name,
     'email': email,
     'phone_primary': phone,
+    'cnic': cnic,
     'card_number': cardNumber,
     'role': roleToString(role),
     'status': status,

@@ -19,6 +19,15 @@ async function one<T>(builder: Q): Promise<T> {
   if (error) throw new Error(error.message);
   return data as T;
 }
+/** PostgREST embeds a one-to-one relation as an object and a one-to-many as an
+ *  array. `lab_results` is one-to-one with `lab_orders`; accept both shapes so
+ *  the caller does not depend on that detail. */
+function embeddedResult(value: unknown): Record<string, unknown> | null {
+  if (!value) return null;
+  if (Array.isArray(value)) return (value[0] as Record<string, unknown>) ?? null;
+  return value as Record<string, unknown>;
+}
+
 async function encPatient(encId: string): Promise<string | null> {
   const { data } = await supabase.from('encounters').select('patient_id').eq('id', encId).maybeSingle();
   return (data?.patient_id as string) ?? null;
@@ -44,15 +53,32 @@ export const doctorApi = {
     if (error) throw new Error(error.message);
   },
 
-  async searchPatient(cardNumber: string): Promise<PatientSummary> {
-    const prof = await one<Q>(supabase.from('profiles').select('*').eq('card_number', cardNumber).eq('role', 'patient').maybeSingle());
-    if (!prof) throw new Error('No patient found with that Hayaat ID.');
+  /**
+   * P-FR-019 — find a patient by the identifier printed on their card:
+   * a 13-digit CNIC, or the 16-digit Hayaat number.
+   *
+   * Goes through `find_patient_by_identifier`, a staff-only SECURITY DEFINER
+   * function. Clinical RLS scopes `profiles` to patients this doctor already
+   * treats, so a plain select cannot find a walk-in; the function returns
+   * demographics only and writes its own audit row for every hit.
+   */
+  async searchPatient(identifier: string): Promise<PatientSummary> {
+    const digits = identifier.replace(/\D/g, '');
+    if (digits.length !== 13 && digits.length !== 16) {
+      throw new Error('Enter a 13-digit CNIC or a 16-digit Hayaat ID.');
+    }
+    const found = await rows<Q>(supabase.rpc('find_patient_by_identifier', { p_identifier: digits }));
+    const prof = found[0];
+    if (!prof) {
+      throw new Error(digits.length === 13
+        ? 'No patient is registered with that CNIC.'
+        : 'No patient found with that Hayaat ID.');
+    }
     const id = prof.id as string;
-    const pp = await one<Q>(supabase.from('patient_profiles').select('*').eq('id', id).maybeSingle());
     const allergies = await rows<Record<string, unknown>>(supabase.from('allergies').select('*').eq('patient_id', id));
     const conds = await rows<Record<string, unknown>>(supabase.from('conditions').select('*').eq('patient_id', id).eq('clinical_status', 'active'));
-    await supabase.from('audit_logs').insert({ actor_id: await myId(), actor_role: 'doctor', action: 'read', resource_type: 'patient_profiles', resource_id: id, patient_id: id });
-    return { ...prof, blood_group: pp?.blood_group, allergies, active_conditions: conds } as PatientSummary;
+    // The lookup function writes the audit row, so no second insert here.
+    return { ...prof, allergies, active_conditions: conds } as PatientSummary;
   },
   async patient(id: string): Promise<PatientSummary> {
     const prof = await one<Q>(supabase.from('profiles').select('*').eq('id', id).maybeSingle());
@@ -214,7 +240,10 @@ export const doctorApi = {
       supabase.from('lab_orders').select('*, patient:profiles!patient_id(full_name), lab_results(*)')
         .eq('ordering_doctor_id', me).in('status', ['resulted', 'reviewed']),
     );
-    return data.map((r) => ({ ...r, result: r.lab_results?.[0] ?? null })) as LabOrderForReview[];
+    // lab_results.lab_order_id is UNIQUE, so PostgREST embeds the result as a
+    // single object rather than an array. Older code read `[0]` and always got
+    // undefined, which left the review page with no values and no file link.
+    return data.map((r) => ({ ...r, result: embeddedResult(r.lab_results) })) as LabOrderForReview[];
   },
   async reviewLabOrder(id: string) {
     const { error } = await supabase.from('lab_orders').update({ status: 'reviewed', reviewed_at: nowIso() }).eq('id', id);

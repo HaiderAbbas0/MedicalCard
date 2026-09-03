@@ -59,15 +59,28 @@ class ReceptionistService {
         .toList();
   }
 
-  Future<Map<String, dynamic>> searchPatient(String hayaatId) async {
-    final p = await db
-        .from('profiles')
-        .select('id, full_name, card_number, phone_primary')
-        .eq('card_number', hayaatId.replaceAll(RegExp(r'\D'), ''))
-        .eq('role', 'patient')
-        .maybeSingle();
-    if (p == null) throw Exception('No patient found with that Hayaat ID.');
-    return Map<String, dynamic>.from(p);
+  /// Find a patient at the front desk by 13-digit CNIC or 16-digit Hayaat ID.
+  /// Uses the same staff-only lookup RPC as the doctor so a receptionist can
+  /// serve a walk-in without being granted a blanket read over `profiles`.
+  Future<Map<String, dynamic>> searchPatient(String identifier) async {
+    final digits = identifier.replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 13 && digits.length != 16) {
+      throw Exception('Enter a 13-digit CNIC or a 16-digit Hayaat ID.');
+    }
+    final rows =
+        await db.rpc(
+              'find_patient_by_identifier',
+              params: {'p_identifier': digits},
+            )
+            as List;
+    if (rows.isEmpty) {
+      throw Exception(
+        digits.length == 13
+            ? 'No patient is registered with that CNIC.'
+            : 'No patient found with that Hayaat ID.',
+      );
+    }
+    return Map<String, dynamic>.from(rows.first as Map);
   }
 
   Future<void> bookAppointment({

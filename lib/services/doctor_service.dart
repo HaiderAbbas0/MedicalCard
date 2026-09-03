@@ -55,20 +55,35 @@ class DoctorService {
       db.from('appointments').update({'status': 'no_show'}).eq('id', id);
 
   // ── Patients ────────────────────────────────────────────────────────────────
-  Future<PatientSummary> searchPatient(String hayaatId) async {
-    final prof = await db
-        .from('profiles')
-        .select()
-        .eq('card_number', hayaatId.replaceAll(RegExp(r'\D'), ''))
-        .eq('role', 'patient')
-        .maybeSingle();
-    if (prof == null) throw Exception('No patient found with that Hayaat ID.');
+
+  /// P-FR-019 — find a patient from the identifier printed on their card.
+  ///
+  /// Accepts a 13-digit CNIC (the citizen identity) or a 16-digit Hayaat ID.
+  /// The lookup goes through `find_patient_by_identifier`, a SECURITY DEFINER
+  /// function: clinical RLS scopes `profiles` to patients the doctor already
+  /// has a care relationship with, so a direct select cannot find a walk-in.
+  /// The function is staff-only, returns demographics only, and writes its own
+  /// audit row for every hit.
+  Future<PatientSummary> searchPatient(String identifier) async {
+    final digits = identifier.replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 13 && digits.length != 16) {
+      throw Exception('Enter a 13-digit CNIC or a 16-digit Hayaat ID.');
+    }
+    final rows =
+        await db.rpc(
+              'find_patient_by_identifier',
+              params: {'p_identifier': digits},
+            )
+            as List;
+    if (rows.isEmpty) {
+      throw Exception(
+        digits.length == 13
+            ? 'No patient is registered with that CNIC.'
+            : 'No patient found with that Hayaat ID.',
+      );
+    }
+    final prof = Map<String, dynamic>.from(rows.first as Map);
     final id = prof['id'].toString();
-    final pp = await db
-        .from('patient_profiles')
-        .select()
-        .eq('id', id)
-        .maybeSingle();
     final allergies =
         await db.from('allergies').select().eq('patient_id', id) as List;
     final conds =
@@ -78,17 +93,10 @@ class DoctorService {
                 .eq('patient_id', id)
                 .eq('clinical_status', 'active')
             as List;
-    await db.from('audit_logs').insert({
-      'actor_id': _me,
-      'actor_role': 'doctor',
-      'action': 'read',
-      'resource_type': 'patient_profiles',
-      'resource_id': id,
-      'patient_id': id,
-    });
+    // The lookup RPC already writes the audit row for this access, so the
+    // client no longer inserts a second one.
     return PatientSummary.fromJson({
-      ...Map<String, dynamic>.from(prof),
-      'blood_group': pp?['blood_group'],
+      ...prof,
       'allergies': allergies,
       'active_conditions': conds,
     });
@@ -354,9 +362,13 @@ class DoctorService {
             as List;
     return rows.map((r) {
       final m = Map<String, dynamic>.from(r);
-      final results = r['lab_results'] as List?;
-      m['result'] = (results != null && results.isNotEmpty)
-          ? results.first
+      // lab_results.lab_order_id is UNIQUE, so PostgREST returns the result as
+      // a single object, not a list. Accept either shape.
+      final raw = r['lab_results'];
+      m['result'] = raw is Map
+          ? raw
+          : (raw is List && raw.isNotEmpty)
+          ? raw.first
           : null;
       return m;
     }).toList();

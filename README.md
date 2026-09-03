@@ -1,7 +1,12 @@
 # HayaatID Health Platform
 
-A centralized digital health-card platform where each patient and staff member
-receives a random, unique, 16-digit numeric Hayaat ID.
+A centralized digital health-card platform for Pakistan. Every citizen is
+identified by their **13-digit CNIC** — that is the key they register with, log
+in with, and that a doctor types to pull up their record (prototype scope
+P-FR-001/002/005/019). On top of that identity each account is also issued a
+random, unique, **16-digit Hayaat ID**: the number printed on the physical and
+virtual health card. The two are complementary — CNIC identifies the person,
+the Hayaat ID identifies the card.
 
 ## Architecture: Supabase-first (single production backend)
 
@@ -19,7 +24,7 @@ directly — there is no separate application API server.
 
 | Layer | Responsibility |
 | ----- | -------------- |
-| **Supabase Auth** | Identity and sessions. Login via Hayaat ID, email, phone, or staff Employee ID. |
+| **Supabase Auth** | Identity and sessions. Login via CNIC, Hayaat ID, email, phone, or staff Employee ID — all resolved by the `login_email()` RPC. |
 | **Supabase Postgres** | All data. **Row Level Security on every table** (verified by an automated suite), `SECURITY DEFINER` role helpers, triggers, audit log. See `supabase/`. |
 | **Supabase Storage** | `lab-results` (private, signed-URL access) and `card-photos` (owner-write) buckets. |
 | **Supabase Realtime** | Live delivery of chat messages between patient and doctor. |
@@ -42,7 +47,7 @@ directly — there is no separate application API server.
 | Role          | Client       | Highlights                                                        |
 | ------------- | ------------ | ----------------------------------------------------------------- |
 | Patient       | Mobile       | Health timeline, prescriptions, lab results, book appointments, **chat with doctors**, digital card, **data export / account deletion** |
-| Doctor        | Mobile + Web | Search patient by Hayaat ID, encounters, prescribe (allergy check), lab orders, review/release results, availability, **Messages** |
+| Doctor        | Mobile + Web | **Search patient by CNIC**, encounters, prescribe (allergy check), lab orders, review/release results, availability, **Messages** |
 | Lab worker    | Mobile + Web | Priority order queue, sample tracking, result upload (masked patient identity) |
 | Receptionist  | Mobile + Web | Clinic schedule, walk-in booking, check-in (demographics only)    |
 | Admin         | Web          | Approve doctors/labs, suspend/reactivate users, clinics, dashboard, audit log, **notification bell**, **card-delivery queue**, **account-deletion requests** |
@@ -84,8 +89,18 @@ editor, run these **in order** (all idempotent):
 schema.sql → cards.sql → revision.sql → security.sql → chat.sql
           → security_hardening.sql → compliance.sql → card_workflow.sql
           → perf_indexes.sql → product_hardening.sql → remove_demo_data.sql
-          → hayaat_id_only.sql → patient_records.sql
+          → hayaat_id_only.sql → patient_records.sql → cnic_identity.sql
+          → clinical_narrative_rls.sql → card_number_consistency.sql
 ```
+
+`cnic_identity.sql` restores the CNIC identity that `hayaat_id_only.sql` had
+dropped, and adds `find_patient_by_identifier()` — the staff-only lookup the
+doctor and receptionist screens use. It keeps the Hayaat card number intact.
+
+**On an already-deployed project**, run [`supabase/FINALIZE.sql`](supabase/FINALIZE.sql)
+instead: one paste that adds everything verified missing from the live database
+(booking RPCs, the corrected `request_card()` signature, CNIC identity, and the
+demo bootstrap).
 
 `security.sql` **and** `security_hardening.sql` are mandatory (they harden RLS).
 The legacy development seed inside `schema.sql` is disabled by default. Do not
@@ -138,6 +153,12 @@ flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_PUBLISHABLE_KE
 ## Testing & verification
 
 ```bash
+# Full integration check: Admin -> Database -> Lab -> Doctor -> Patient.
+# Creates the demo lab reports on first run and then verifies every hand-off:
+# CNIC lookup, ordering, sample tracking, result upload, review, release,
+# patient visibility, signed-URL download, and cross-patient isolation.
+node supabase/tests/verify_e2e.mjs
+
 # Automated Row Level Security suite (signs in as every role, asserts every policy)
 cd supabase/tests && npm install && npm test          # expect: 27 passed, 0 failed
 
@@ -154,6 +175,26 @@ flutter analyze                                        # no errors/warnings
 
 Last verified (against the live dev project): RLS suite **27/27**, card workflow
 **6/6**, `flutter analyze` clean, both web apps build cleanly.
+
+## Demo accounts
+
+Created by `node supabase/tests/seed_demo_accounts.mjs`, then given their staff
+roles by `supabase/demo_seed.sql`. Password for all six: `Hayaat@2026`.
+Sign in with the CNIC.
+
+| Role | CNIC | Email |
+| ---- | ---- | ----- |
+| Admin | `3520100000001` | demo.admin@hayaat.id |
+| Doctor | `3520199999991` | demo.doctor@hayaat.id |
+| Lab worker | `3520177777771` | demo.lab@hayaat.id |
+| Receptionist | `3520166666661` | demo.reception@hayaat.id |
+| Patient | `3520112345671` | demo.patient@hayaat.id |
+| Patient (2nd, for isolation checks) | `3520112345672` | demo.patient2@hayaat.id |
+
+Self-service sign-up can only create `patient` and `doctor` accounts — the role
+is clamped in `handle_new_user()` so nobody can register themselves as an admin.
+That is why the staff roles are promoted by `demo_seed.sql` rather than by the
+seeding script.
 
 ## Known gaps / blocked (need credentials or a product decision)
 

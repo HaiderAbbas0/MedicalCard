@@ -11,7 +11,7 @@ function passwordPolicyError(pw: string): string | null {
 /** Doctor self-registration (P-FR-002). Account is created PENDING. */
 export default function DoctorRegisterPage() {
   const [form, setForm] = useState({
-    full_name: '', phone_primary: '', email: '', password: '',
+    full_name: '', cnic: '', phone_primary: '', email: '', password: '',
     pmdc_number: '', specialization_primary: '',
     qualification_mbbs: true, qualification_fcps: false,
   });
@@ -28,6 +28,9 @@ export default function DoctorRegisterPage() {
     if (!form.full_name.trim() || !form.password || !form.pmdc_number.trim() || !form.specialization_primary.trim()) {
       return setError('Name, password, PMDC number, and specialization are required.');
     }
+    // P-FR-002 — a doctor registers against their own CNIC, same as a patient.
+    const cnic = form.cnic.replace(/\D/g, '');
+    if (!/^\d{13}$/.test(cnic)) return setError('CNIC must be exactly 13 digits.');
     if (!form.email.trim() && !form.phone_primary.trim()) return setError('Email or phone is required.');
     const pwErr = passwordPolicyError(form.password);
     if (pwErr) return setError(pwErr);
@@ -39,6 +42,7 @@ export default function DoctorRegisterPage() {
         options: {
           data: {
             role: 'doctor',
+            cnic,
             full_name: form.full_name.trim(),
             phone: form.phone_primary.trim(),
             email: form.email.trim() || undefined,
@@ -80,6 +84,9 @@ export default function DoctorRegisterPage() {
 
         <div className="field"><label>Full name *</label>
           <input className="input" value={form.full_name} onChange={(e) => set('full_name', e.target.value)} /></div>
+        <div className="field"><label>CNIC *</label>
+          <input className="input" inputMode="numeric" maxLength={13} placeholder="13 digits, no dashes"
+            value={form.cnic} onChange={(e) => set('cnic', e.target.value.replace(/\D/g, '').slice(0, 13))} /></div>
         <div className="row">
           <div className="field" style={{ flex: 1 }}><label>Phone</label>
             <input className="input" value={form.phone_primary} onChange={(e) => set('phone_primary', e.target.value)} /></div>

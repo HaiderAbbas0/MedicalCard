@@ -19,6 +19,8 @@ class PatientSummary {
   final String? gender;
   final String? dateOfBirth;
   final String? bloodGroup;
+  /// 13-digit CNIC — the citizen identity the doctor searches by (P-FR-019).
+  final String? cnic;
   final List<Map<String, dynamic>> allergies;
   final List<Map<String, dynamic>> activeConditions;
 
@@ -29,6 +31,7 @@ class PatientSummary {
     this.gender,
     this.dateOfBirth,
     this.bloodGroup,
+    this.cnic,
     this.allergies = const [],
     this.activeConditions = const [],
   });
@@ -40,6 +43,7 @@ class PatientSummary {
     gender: j['gender'] as String?,
     dateOfBirth: j['date_of_birth'] as String?,
     bloodGroup: j['blood_group'] as String?,
+    cnic: j['cnic'] as String?,
     allergies: ((j['allergies'] as List?) ?? []).cast<Map<String, dynamic>>(),
     activeConditions: ((j['active_conditions'] as List?) ?? [])
         .cast<Map<String, dynamic>>(),
