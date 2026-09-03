@@ -11,7 +11,7 @@ import 'doctor_lab_review_screen.dart';
 import 'doctor_availability_screen.dart';
 import 'doctor_profile_screen.dart';
 
-/// Doctor home — today's appointments + patient search by CNIC (Scope §7.2).
+/// Doctor home — today's appointments + patient search by CNIC (P-FR-019).
 class DoctorHomeScreen extends StatefulWidget {
   const DoctorHomeScreen({super.key});
 
@@ -33,16 +33,29 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
   void _reload() => setState(() => _future = _service.appointments());
 
   Future<void> _searchPatient() async {
-    final cnic = await showDialog<String>(
+    final identifier = await showDialog<String>(
       context: context,
-      builder: (_) => const _CnicSearchDialog(),
+      builder: (_) => const _PatientSearchDialog(),
     );
-    if (cnic == null || cnic.isEmpty) return;
+    if (identifier == null || identifier.isEmpty) return;
+    final digits = identifier.replaceAll(RegExp(r'\D'), '');
+    // 13 digits = CNIC (the usual case at the desk); 16 = Hayaat card number.
+    if (digits.length != 13 && digits.length != 16) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Enter a 13-digit CNIC or a 16-digit Hayaat ID.')),
+        );
+      return;
+    }
     try {
-      final patient = await _service.searchPatient(cnic);
+      final patient = await _service.searchPatient(digits);
       if (!mounted) return;
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => PatientDetailScreen(service: _service, patient: patient)),
+        MaterialPageRoute(
+          builder: (_) =>
+              PatientDetailScreen(service: _service, patient: patient),
+        ),
       );
     } catch (e) {
       if (mounted) _toast(context, e.toString());
@@ -66,11 +79,19 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
                 'availability' => const DoctorAvailabilityScreen(),
                 _ => const DoctorProfileScreen(),
               };
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => screen));
             },
             itemBuilder: (_) => const [
-              PopupMenuItem(value: 'labs', child: Text('Lab results to review')),
-              PopupMenuItem(value: 'availability', child: Text('My availability')),
+              PopupMenuItem(
+                value: 'labs',
+                child: Text('Lab results to review'),
+              ),
+              PopupMenuItem(
+                value: 'availability',
+                child: Text('My availability'),
+              ),
               PopupMenuItem(value: 'profile', child: Text('Edit profile')),
             ],
           ),
@@ -80,7 +101,10 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
         onPressed: _searchPatient,
         backgroundColor: c.primary,
         icon: const Icon(Icons.search, color: Colors.white),
-        label: const Text('Search patient', style: TextStyle(color: Colors.white)),
+        label: const Text(
+          'Search patient',
+          style: TextStyle(color: Colors.white),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async => _reload(),
@@ -95,7 +119,12 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
             }
             final appts = snap.data ?? [];
             if (appts.isEmpty) {
-              return ListView(children: const [SizedBox(height: 120), _EmptyState(text: 'No appointments scheduled.')]);
+              return ListView(
+                children: const [
+                  SizedBox(height: 120),
+                  _EmptyState(text: 'No appointments scheduled.'),
+                ],
+              );
             }
             return ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
@@ -103,16 +132,26 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
               separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (_, i) => _AppointmentCard(
                 appt: appts[i],
-                onConfirm: () => _act(() => _service.confirmAppointment(appts[i].id)),
-                onCheckIn: () => _act(() => _service.checkInAppointment(appts[i].id)),
+                onConfirm: () =>
+                    _act(() => _service.confirmAppointment(appts[i].id)),
+                onCheckIn: () =>
+                    _act(() => _service.checkInAppointment(appts[i].id)),
                 onOpen: () async {
                   final p = appts[i].patient;
                   if (p == null || p['id'] == null) return;
                   try {
-                    final summary = await _service.searchPatient(p['cnic']?.toString() ?? '');
+                    final summary = await _service.searchPatient(
+                      p['card_number']?.toString() ?? '',
+                    );
                     if (!mounted) return;
-                    Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => PatientDetailScreen(service: _service, patient: summary)));
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PatientDetailScreen(
+                          service: _service,
+                          patient: summary,
+                        ),
+                      ),
+                    );
                   } catch (e) {
                     if (mounted) _toast(context, e.toString());
                   }
@@ -170,30 +209,52 @@ class _AppointmentCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(appt.patientName,
-                      style: TextStyle(color: c.text, fontWeight: FontWeight.w700, fontSize: 16)),
+                  child: Text(
+                    appt.patientName,
+                    style: TextStyle(
+                      color: c.text,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
                 ),
                 _StatusChip(appt.status),
               ],
             ),
             const SizedBox(height: 6),
-            Text('${appt.date}  ·  ${appt.time}  ·  ${appt.type.replaceAll('_', ' ')}',
-                style: TextStyle(color: c.text2)),
-            if (appt.notesForDoctor != null && appt.notesForDoctor!.isNotEmpty) ...[
+            Text(
+              '${appt.date}  ·  ${appt.time}  ·  ${appt.type.replaceAll('_', ' ')}',
+              style: TextStyle(color: c.text2),
+            ),
+            if (appt.notesForDoctor != null &&
+                appt.notesForDoctor!.isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text(appt.notesForDoctor!, style: TextStyle(color: c.text3, fontSize: 13)),
+              Text(
+                appt.notesForDoctor!,
+                style: TextStyle(color: c.text3, fontSize: 13),
+              ),
             ],
             const SizedBox(height: 12),
             Row(
               children: [
                 if (appt.status == 'pending')
-                  _SmallBtn(label: 'Confirm', color: c.primary, onTap: onConfirm),
+                  _SmallBtn(
+                    label: 'Confirm',
+                    color: c.primary,
+                    onTap: onConfirm,
+                  ),
                 if (appt.status == 'confirmed') ...[
                   const SizedBox(width: 8),
                   _SmallBtn(label: 'Check in', color: c.safe, onTap: onCheckIn),
                 ],
                 const Spacer(),
-                Text('Open record →', style: TextStyle(color: c.primary, fontWeight: FontWeight.w600)),
+                Text(
+                  'Open record →',
+                  style: TextStyle(
+                    color: c.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ],
@@ -207,7 +268,11 @@ class _SmallBtn extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
-  const _SmallBtn({required this.label, required this.color, required this.onTap});
+  const _SmallBtn({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -231,27 +296,46 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     Color bg = c.infoBg, fg = c.info;
-    if (status == 'confirmed') { bg = c.safeBg; fg = c.safe; }
-    if (status == 'checked_in') { bg = c.mint; fg = c.mintFg; }
-    if (status.startsWith('cancelled') || status == 'no_show') { bg = c.dangerBg; fg = c.danger; }
+    if (status == 'confirmed') {
+      bg = c.safeBg;
+      fg = c.safe;
+    }
+    if (status == 'checked_in') {
+      bg = c.mint;
+      fg = c.mintFg;
+    }
+    if (status.startsWith('cancelled') || status == 'no_show') {
+      bg = c.dangerBg;
+      fg = c.danger;
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(99)),
-      child: Text(status.replaceAll('_', ' '), style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 12)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        status.replaceAll('_', ' '),
+        style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 12),
+      ),
     );
   }
 }
 
-class _CnicSearchDialog extends StatefulWidget {
-  const _CnicSearchDialog();
+class _PatientSearchDialog extends StatefulWidget {
+  const _PatientSearchDialog();
   @override
-  State<_CnicSearchDialog> createState() => _CnicSearchDialogState();
+  State<_PatientSearchDialog> createState() => _PatientSearchDialogState();
 }
 
-class _CnicSearchDialogState extends State<_CnicSearchDialog> {
+class _PatientSearchDialogState extends State<_PatientSearchDialog> {
   final _ctrl = TextEditingController();
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -260,11 +344,19 @@ class _CnicSearchDialogState extends State<_CnicSearchDialog> {
         controller: _ctrl,
         keyboardType: TextInputType.number,
         autofocus: true,
-        decoration: const InputDecoration(hintText: '13-digit CNIC (no dashes)'),
+        decoration: const InputDecoration(
+          hintText: '13-digit CNIC (or 16-digit Hayaat ID)',
+        ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(context, _ctrl.text.trim()), child: const Text('Search')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _ctrl.text.trim()),
+          child: const Text('Search'),
+        ),
       ],
     );
   }
@@ -274,8 +366,9 @@ class _EmptyState extends StatelessWidget {
   final String text;
   const _EmptyState({required this.text});
   @override
-  Widget build(BuildContext context) =>
-      Center(child: Text(text, style: TextStyle(color: context.c.text3)));
+  Widget build(BuildContext context) => Center(
+    child: Text(text, style: TextStyle(color: context.c.text3)),
+  );
 }
 
 class _ErrorState extends StatelessWidget {
@@ -284,11 +377,21 @@ class _ErrorState extends StatelessWidget {
   const _ErrorState({required this.message, required this.onRetry});
   @override
   Widget build(BuildContext context) {
-    return ListView(children: [
-      const SizedBox(height: 120),
-      Center(child: Text(message, textAlign: TextAlign.center, style: TextStyle(color: context.c.danger))),
-      const SizedBox(height: 12),
-      Center(child: TextButton(onPressed: onRetry, child: const Text('Retry'))),
-    ]);
+    return ListView(
+      children: [
+        const SizedBox(height: 120),
+        Center(
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: context.c.danger),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ),
+      ],
+    );
   }
 }

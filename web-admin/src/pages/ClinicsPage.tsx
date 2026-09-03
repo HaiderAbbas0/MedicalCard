@@ -24,12 +24,28 @@ export default function ClinicsPage() {
 
   async function create(e: FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) return;
+    setError('');
+    if (!form.name.trim() || !form.phone.trim() || !form.address_city.trim() || !form.address_province.trim()) {
+      setError('Name, phone, city, and province are required.');
+      return;
+    }
+    const duplicate = clinics?.some((clinic) =>
+      clinic.name.trim().toLowerCase() === form.name.trim().toLowerCase() &&
+      String(clinic.address_city ?? '').trim().toLowerCase() === form.address_city.trim().toLowerCase(),
+    );
+    if (duplicate) {
+      setError('A clinic or hospital with this name already exists in that city.');
+      return;
+    }
 
     // If any receptionist field is filled, require all three before proceeding.
     if (receptionistFilled) {
       if (!receptionist.full_name.trim() || !receptionist.employee_id.trim() || !receptionist.password.trim()) {
         setError('Fill out all receptionist fields (Full Name, Employee ID, Password), or leave them all blank.');
+        return;
+      }
+      if (receptionist.password.length < 8 || !/[A-Za-z]/.test(receptionist.password) || !/\d/.test(receptionist.password)) {
+        setError('Receptionist password must be at least 8 characters and include a letter and a number.');
         return;
       }
     }
@@ -133,16 +149,16 @@ export default function ClinicsPage() {
               </select>
             </div>
             <div className="field">
-              <label>Phone</label>
+              <label>Phone *</label>
               <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </div>
             <div className="row">
               <div className="field" style={{ flex: 1 }}>
-                <label>City</label>
+                <label>City *</label>
                 <input className="input" value={form.address_city} onChange={(e) => setForm({ ...form, address_city: e.target.value })} />
               </div>
               <div className="field" style={{ flex: 1 }}>
-                <label>Province</label>
+                <label>Province *</label>
                 <input className="input" value={form.address_province} onChange={(e) => setForm({ ...form, address_province: e.target.value })} />
               </div>
             </div>

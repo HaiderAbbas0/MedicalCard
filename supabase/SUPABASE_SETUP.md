@@ -7,16 +7,34 @@ three steps once.
 Supabase dashboard → **SQL Editor** → **New query**. Paste and **Run** each file
 **in this exact order** (all are idempotent / safe to re-run):
 
-1. [`schema.sql`](./schema.sql) — tables, base RLS, signup trigger, buckets, demo accounts + data
+1. [`schema.sql`](./schema.sql) — tables, base RLS, signup trigger, and buckets. Its optional development seed is disabled by default.
 2. [`cards.sql`](./cards.sql) — card numbers, the `cards` table, request RPCs, `card-photos` bucket
 3. [`revision.sql`](./revision.sql) — `medication_logs`, card-number assignment at signup, `login_email` RPC
 4. [`security.sql`](./security.sql) — **MANDATORY.** Hardens the RLS policies (restricts PHI to owner/staff, makes the `lab-results` bucket private, prevents self-signup role escalation and audit-log forgery). The DB is **not safe without this.**
-5. [`fix_demo_login.sql`](./fix_demo_login.sql) — fixes NULL auth token columns on the seeded demo accounts
-6. [`chat.sql`](./chat.sql) — real patient↔doctor messaging (`conversations` + `messages` tables, RLS, realtime)
-7. [`security_hardening.sql`](./security_hardening.sql) — Phase-5 fixes: gate `is_staff()` on `status = 'active'` (so suspended/pending staff lose data access), restrict `card-photos` writes to the owner's folder, make `audit_logs` strictly append-only, and stamp every audit entry with the server-observed IP / device / role / time (clients can't spoof them)
-8. [`compliance.sql`](./compliance.sql) — consent storage (`consents`), account-deletion requests (`deletion_requests`), and the `export_my_data()` data-portability function
-9. [`card_workflow.sql`](./card_workflow.sql) — notifies admins in-app when a patient applies for a card or requests physical delivery, and lets admins mark cards delivered
-10. [`perf_indexes.sql`](./perf_indexes.sql) — performance indexes on the foreign-key / filter columns used by queries and RLS (patient timeline, patient search, lab queue, notifications, audit). Safe to run any time.
+5. [`chat.sql`](./chat.sql) — real patient↔doctor messaging (`conversations` + `messages` tables, RLS, realtime)
+6. [`security_hardening.sql`](./security_hardening.sql) — gates `is_staff()` on active status, restricts photo writes, and hardens audit logs
+7. [`compliance.sql`](./compliance.sql) — consent, account-deletion requests, and data export
+8. [`card_workflow.sql`](./card_workflow.sql) — card notifications and delivery workflow
+9. [`perf_indexes.sql`](./perf_indexes.sql) — query and RLS indexes
+10. [`product_hardening.sql`](./product_hardening.sql) — scheduling constraints, prescription footer fields, email login, and double-booking prevention
+11. [`remove_demo_data.sql`](./remove_demo_data.sql) — removes legacy fixed demo identities if this project was previously seeded
+12. [`hayaat_id_only.sql`](./hayaat_id_only.sql) — issues every account a unique 16-digit numeric Hayaat ID (the number printed on the health card)
+13. [`patient_records.sql`](./patient_records.sql) — specialty record library, durable lab file paths, generic documents, and secure original-file storage
+14. [`cnic_identity.sql`](./cnic_identity.sql) — **restores the 13-digit CNIC as the citizen identity** (P-FR-001/002/005/019): `profiles.cnic` with a uniqueness guarantee, CNIC accepted at login, and `find_patient_by_identifier()` for staff patient lookup. `hayaat_id_only.sql` had dropped the column; this puts it back **without** removing the Hayaat card number — the two coexist.
+15. [`clinical_narrative_rls.sql`](./clinical_narrative_rls.sql) — keeps the consultation narrative (encounters, diagnoses, prescriptions, vitals, allergies) away from lab workers and receptionists
+16. [`card_number_consistency.sql`](./card_number_consistency.sql) — one Hayaat number per patient: `request_card()` reuses the number issued at sign-up instead of minting a new one, and `profiles` / `cards` / `patient_profiles` are reconciled
+17. [`demo_seed.sql`](./demo_seed.sql) — optional. Demo clinic, laboratory, and staff roles for the six demo accounts. Run `node ../tests/seed_demo_accounts.mjs` first.
+
+Files 1-17 are also mirrored as timestamped migrations under
+[`migrations/`](./migrations), so `supabase db push` can apply them to a linked
+project instead of pasting into the SQL editor.
+
+### Already have a deployed project?
+
+`FINALIZE.sql` bundles everything that was verified missing from the live
+project into one paste: the booking RPCs, the corrected `request_card()`
+signature, `cnic_identity.sql`, and `demo_seed.sql`. Run that instead of
+replaying the list above.
 
 > Order matters: `security.sql` re-defines policies created by `schema.sql`, and
 > `security_hardening.sql` re-defines `is_staff()` from `security.sql` — so run
@@ -29,8 +47,8 @@ cd supabase/tests && npm install && npm test    # exit 0 = all policies correct
 ```
 
 ## 2. Turn OFF email confirmation
-Because logins use CNIC (mapped internally to `<cnic>@hayaat.id`), there are no
-real inboxes to confirm.
+Development may disable email confirmation because phone-only accounts use an
+internal auth alias. Production must use verified email or phone ownership.
 
 Dashboard → **Authentication** → **Providers** → **Email** → turn **OFF**
 "Confirm email" → Save.
@@ -44,20 +62,9 @@ The apps are already wired with your keys:
   `web-admin/.env` · `web-staff/.env` (web).
 
 ## Login model
-- **New patients** sign up with name + phone + password (email optional) and **log in with their phone number**.
-- **Staff** (and the seeded demo accounts below) **log in with their CNIC**.
-- After signing up, a patient taps **"Request your card"** to set DOB / blood group / city / Urdu name / photo and receive a `HAY-PAT-####` number + virtual card.
-
-## Demo accounts — login with the **CNIC** shown + password (`password123`)
-| Role | CNIC |
-|---|---|
-| Patient | `3520112345671` |
-| Doctor | `3520199999991` |
-| Lab worker | `3520177777771` |
-| Receptionist | `3520166666661` |
-| Admin (web) | `3520100000001` |
-
-Pending doctor `3520188888882` and a pending lab seed the admin approval queue.
+- **New patients** receive a 16-digit Hayaat ID and log in with Hayaat ID, email, or phone.
+- **Staff** receive a 16-digit Hayaat ID and log in with Hayaat ID, Employee ID, or email.
+- A patient uses the same Hayaat ID on their virtual and physical card.
 
 ## Web apps (also on Supabase now)
 Both web apps talk to Supabase directly (no Node backend):

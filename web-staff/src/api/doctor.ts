@@ -5,6 +5,9 @@ import type { Appointment, AvailabilitySlot, Encounter, LabOrderForReview, Patie
 type Q = any;
 const nowIso = () => new Date().toISOString();
 const today = () => nowIso().slice(0, 10);
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const ALLOWED_DOCUMENT_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/dicom']);
+const allowedDocumentName = (name: string) => /\.(pdf|jpe?g|png|webp|gif|dcm)$/i.test(name);
 
 async function rows<T>(builder: Q): Promise<T[]> {
   const { data, error } = await builder;
@@ -16,6 +19,15 @@ async function one<T>(builder: Q): Promise<T> {
   if (error) throw new Error(error.message);
   return data as T;
 }
+/** PostgREST embeds a one-to-one relation as an object and a one-to-many as an
+ *  array. `lab_results` is one-to-one with `lab_orders`; accept both shapes so
+ *  the caller does not depend on that detail. */
+function embeddedResult(value: unknown): Record<string, unknown> | null {
+  if (!value) return null;
+  if (Array.isArray(value)) return (value[0] as Record<string, unknown>) ?? null;
+  return value as Record<string, unknown>;
+}
+
 async function encPatient(encId: string): Promise<string | null> {
   const { data } = await supabase.from('encounters').select('patient_id').eq('id', encId).maybeSingle();
   return (data?.patient_id as string) ?? null;
@@ -24,7 +36,7 @@ async function encPatient(encId: string): Promise<string | null> {
 export const doctorApi = {
   async appointments(date?: string): Promise<Appointment[]> {
     const me = await myId();
-    let q: Q = supabase.from('appointments').select('*, patient:profiles!patient_id(id, full_name, cnic)').eq('doctor_id', me);
+    let q: Q = supabase.from('appointments').select('*, patient:profiles!patient_id(id, full_name, card_number)').eq('doctor_id', me);
     if (date) q = q.eq('appointment_date', date);
     return rows<Appointment>(q);
   },
@@ -41,15 +53,32 @@ export const doctorApi = {
     if (error) throw new Error(error.message);
   },
 
-  async searchPatient(cardNumber: string): Promise<PatientSummary> {
-    const prof = await one<Q>(supabase.from('profiles').select('*').eq('card_number', cardNumber).eq('role', 'patient').maybeSingle());
-    if (!prof) throw new Error('No patient found with that Card Number.');
+  /**
+   * P-FR-019 — find a patient by the identifier printed on their card:
+   * a 13-digit CNIC, or the 16-digit Hayaat number.
+   *
+   * Goes through `find_patient_by_identifier`, a staff-only SECURITY DEFINER
+   * function. Clinical RLS scopes `profiles` to patients this doctor already
+   * treats, so a plain select cannot find a walk-in; the function returns
+   * demographics only and writes its own audit row for every hit.
+   */
+  async searchPatient(identifier: string): Promise<PatientSummary> {
+    const digits = identifier.replace(/\D/g, '');
+    if (digits.length !== 13 && digits.length !== 16) {
+      throw new Error('Enter a 13-digit CNIC or a 16-digit Hayaat ID.');
+    }
+    const found = await rows<Q>(supabase.rpc('find_patient_by_identifier', { p_identifier: digits }));
+    const prof = found[0];
+    if (!prof) {
+      throw new Error(digits.length === 13
+        ? 'No patient is registered with that CNIC.'
+        : 'No patient found with that Hayaat ID.');
+    }
     const id = prof.id as string;
-    const pp = await one<Q>(supabase.from('patient_profiles').select('*').eq('id', id).maybeSingle());
     const allergies = await rows<Record<string, unknown>>(supabase.from('allergies').select('*').eq('patient_id', id));
     const conds = await rows<Record<string, unknown>>(supabase.from('conditions').select('*').eq('patient_id', id).eq('clinical_status', 'active'));
-    await supabase.from('audit_logs').insert({ actor_id: await myId(), actor_role: 'doctor', action: 'read', resource_type: 'patient_profiles', resource_id: id, patient_id: id });
-    return { ...prof, blood_group: pp?.blood_group, allergies, active_conditions: conds } as PatientSummary;
+    // The lookup function writes the audit row, so no second insert here.
+    return { ...prof, allergies, active_conditions: conds } as PatientSummary;
   },
   async patient(id: string): Promise<PatientSummary> {
     const prof = await one<Q>(supabase.from('profiles').select('*').eq('id', id).maybeSingle());
@@ -78,6 +107,81 @@ export const doctorApi = {
   async recordAllergy(id: string, body: Record<string, unknown>) {
     const { error } = await supabase.from('allergies').insert({ patient_id: id, recorded_by_id: await myId(), clinical_status: 'active', ...body });
     if (error) throw new Error(error.message);
+  },
+
+  async uploadMedicalDocument(patientId: string, body: {
+    title: string;
+    specialty: string;
+    record_type: string;
+    record_date: string;
+    notes?: string;
+    files: File[];
+    onProgress?: (uploaded: number, total: number, currentFile: string) => void;
+  }) {
+    const me = await myId();
+    const profile = await fetchFullProfile(me);
+    const ext = profile?.extended ?? {};
+    const files = body.files.filter(Boolean);
+    if (!files.length) throw new Error('Choose at least one file to upload.');
+    if (files.length > 10) throw new Error('Upload up to 10 files at a time.');
+
+    files.forEach((file) => {
+      if (file.size <= 0) throw new Error(`${file.name} is empty.`);
+      if (file.size > MAX_UPLOAD_BYTES) throw new Error(`${file.name} is larger than 25 MB.`);
+      if (file.type && !ALLOWED_DOCUMENT_TYPES.has(file.type) && !allowedDocumentName(file.name)) {
+        throw new Error(`${file.name} is not a supported PDF, image, or DICOM file.`);
+      }
+    });
+
+    const uploaded: { path: string; file: File }[] = [];
+    try {
+      for (const [index, file] of files.entries()) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `${patientId}/uploads/${Date.now()}-${index + 1}-${safeName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('medical-documents')
+          .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+        if (uploadError) throw new Error(uploadError.message);
+        uploaded.push({ path, file });
+        body.onProgress?.(uploaded.length, files.length, file.name);
+      }
+    } catch (error) {
+      if (uploaded.length) await supabase.storage.from('medical-documents').remove(uploaded.map((u) => u.path));
+      throw error;
+    }
+
+    const { error } = await supabase.from('medical_documents').insert({
+      patient_id: patientId,
+      uploaded_by: me,
+      doctor_id: me,
+      clinic_id: ext.clinic_id ?? null,
+      specialty: body.specialty,
+      record_type: body.record_type,
+      title: body.title,
+      record_date: body.record_date,
+      facility_name: '',
+      doctor_name: profile?.full_name ?? '',
+      notes: body.notes ?? null,
+      file_paths: uploaded.map((u) => u.path),
+      file_names: uploaded.map((u) => u.file.name),
+      mime_types: uploaded.map((u) => u.file.type || 'application/octet-stream'),
+      extracted_metadata: {
+        uploaded_by_role: 'doctor',
+        owner_patient_id: patientId,
+        file_count: uploaded.length,
+        total_bytes: uploaded.reduce((sum, u) => sum + u.file.size, 0),
+      },
+    });
+    if (error) {
+      await supabase.storage.from('medical-documents').remove(uploaded.map((u) => u.path));
+      throw new Error(error.message);
+    }
+    await supabase.from('notifications').insert({
+      recipient_id: patientId,
+      type: 'record_added',
+      title: 'New medical document',
+      body: `${body.title} has been added to your records.`,
+    });
   },
 
   async createEncounter(patientId: string, chiefComplaint?: string): Promise<Encounter> {
@@ -112,7 +216,17 @@ export const doctorApi = {
     if (error) throw new Error(error.message);
   },
   async finalizeEncounter(id: string): Promise<Encounter> {
-    const row = await one<Q>(supabase.from('encounters').update({ status: 'finalized', finalized_at: nowIso() }).eq('id', id).select().single());
+    const me = await myId();
+    const profile = await fetchFullProfile(me);
+    const signature = profile?.extended ?? {};
+    const credentials = String(signature.prescription_signature_credentials ?? [signature.qualification_mbbs ? 'MBBS' : '', signature.qualification_fcps ? 'FCPS' : ''].filter(Boolean).join(', '));
+    const row = await one<Q>(supabase.from('encounters').update({
+      status: 'finalized',
+      finalized_at: nowIso(),
+      prescription_signature_name: String(signature.prescription_signature_name ?? profile?.full_name ?? ''),
+      prescription_signature_credentials: credentials,
+      prescription_signature_footer: String(signature.prescription_signature_footer ?? signature.pmdc_number ?? ''),
+    }).eq('id', id).select().single());
     await supabase.from('notifications').insert({ recipient_id: row.patient_id, type: 'record_added', title: 'New record added', body: 'A new entry has been added to your health timeline.', resource_id: id });
     return row as Encounter;
   },
@@ -126,7 +240,10 @@ export const doctorApi = {
       supabase.from('lab_orders').select('*, patient:profiles!patient_id(full_name), lab_results(*)')
         .eq('ordering_doctor_id', me).in('status', ['resulted', 'reviewed']),
     );
-    return data.map((r) => ({ ...r, result: r.lab_results?.[0] ?? null })) as LabOrderForReview[];
+    // lab_results.lab_order_id is UNIQUE, so PostgREST embeds the result as a
+    // single object rather than an array. Older code read `[0]` and always got
+    // undefined, which left the review page with no values and no file link.
+    return data.map((r) => ({ ...r, result: embeddedResult(r.lab_results) })) as LabOrderForReview[];
   },
   async reviewLabOrder(id: string) {
     const { error } = await supabase.from('lab_orders').update({ status: 'reviewed', reviewed_at: nowIso() }).eq('id', id);
@@ -141,7 +258,14 @@ export const doctorApi = {
     return rows<AvailabilitySlot>(supabase.from('doctor_availability').select('*').eq('doctor_id', await myId()));
   },
   async addAvailability(body: Record<string, unknown>): Promise<AvailabilitySlot> {
-    return one<AvailabilitySlot>(supabase.from('doctor_availability').insert({ doctor_id: await myId(), is_active: true, ...body }).select().single());
+    try {
+      return await one<AvailabilitySlot>(supabase.from('doctor_availability').insert({ doctor_id: await myId(), is_active: true, ...body }).select().single());
+    } catch (error) {
+      if (error instanceof Error && (error.message.includes('doctor_availability_unique_slot') || error.message.includes('duplicate key'))) {
+        throw new Error('This weekly slot already exists.');
+      }
+      throw error;
+    }
   },
   async deleteAvailability(id: string) {
     const { error } = await supabase.from('doctor_availability').delete().eq('id', id);

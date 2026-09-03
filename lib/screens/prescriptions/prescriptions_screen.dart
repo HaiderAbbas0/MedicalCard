@@ -23,8 +23,9 @@ class _PrescriptionsScreenState extends State<PrescriptionsScreen> {
   @override
   Widget build(BuildContext context) {
     final records = context.watch<RecordController>();
-    final items =
-        records.prescriptions.where((r) => r.active == _active).toList();
+    final items = records.prescriptions
+        .where((r) => r.active == _active)
+        .toList();
     return Scaffold(
       backgroundColor: context.c.bg,
       body: SafeArea(
@@ -36,28 +37,45 @@ class _PrescriptionsScreenState extends State<PrescriptionsScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text('Prescriptions',
-                        style: AppText.display
-                            .copyWith(fontSize: 24, color: context.c.text)),
+                    child: Text(
+                      'Prescriptions',
+                      style: AppText.display.copyWith(
+                        fontSize: 24,
+                        color: context.c.text,
+                      ),
+                    ),
                   ),
                   PressScale(
                     onTap: () => context.push('/reminders'),
                     semanticLabel: 'Medicine reminders',
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 9,
+                      ),
                       decoration: BoxDecoration(
                         gradient: brandGradient(context),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: const [
-                        Icon(Icons.alarm_rounded, size: 17, color: Colors.white),
-                        SizedBox(width: 6),
-                        Text('Reminders',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(
+                            Icons.alarm_rounded,
+                            size: 17,
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'Reminders',
                             style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700)),
-                      ]),
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -101,8 +119,12 @@ class _PrescriptionsScreenState extends State<PrescriptionsScreen> {
                         const SizedBox(height: 90),
                         Center(
                           child: Text(
-                            _active ? 'No active prescriptions.' : 'No past prescriptions.',
-                            style: AppText.body.copyWith(color: context.c.text3),
+                            _active
+                                ? 'No active prescriptions.'
+                                : 'No past prescriptions.',
+                            style: AppText.body.copyWith(
+                              color: context.c.text3,
+                            ),
                           ),
                         ),
                       ],
@@ -149,8 +171,9 @@ class _Segment extends StatelessWidget {
           child: Text(
             label,
             style: AppText.caption.copyWith(
-                fontWeight: FontWeight.w700,
-                color: selected ? Colors.white : context.c.text2),
+              fontWeight: FontWeight.w700,
+              color: selected ? Colors.white : context.c.text2,
+            ),
           ),
         ),
       ),
@@ -194,23 +217,27 @@ class _RxCard extends StatelessWidget {
                       TextSpan(
                         text: rx.name,
                         style: AppText.bodyStrong.copyWith(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: c.text),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: c.text,
+                        ),
                         children: [
                           TextSpan(
                             text: ' ${rx.strength}',
                             style: AppText.bodyStrong.copyWith(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: c.text2),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: c.text2,
+                            ),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text('${rx.freq} · ${rx.dur}',
-                        style: AppText.caption.copyWith(color: c.text2)),
+                    Text(
+                      '${rx.freq} · ${rx.dur}',
+                      style: AppText.caption.copyWith(color: c.text2),
+                    ),
                   ],
                 ),
               ),
@@ -224,15 +251,24 @@ class _RxCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text('By ${rx.by}',
-                    style: AppText.caption
-                        .copyWith(fontSize: 12.5, color: c.text2)),
+                child: Text(
+                  'By ${rx.by}',
+                  style: AppText.caption.copyWith(
+                    fontSize: 12.5,
+                    color: c.text2,
+                  ),
+                ),
               ),
-              Text(rx.date,
-                  style: AppText.caption
-                      .copyWith(fontSize: 12.5, color: c.text3)),
+              Text(
+                rx.date,
+                style: AppText.caption.copyWith(fontSize: 12.5, color: c.text3),
+              ),
             ],
           ),
+          if (rx.instructions.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(rx.instructions, style: AppText.body.copyWith(color: c.text)),
+          ],
           if (rx.warn != null) ...[
             const SizedBox(height: 12),
             Container(
@@ -246,12 +282,42 @@ class _RxCard extends StatelessWidget {
                   Icon(Icons.warning_amber_rounded, size: 18, color: c.warn),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(rx.warn!,
-                        style: AppText.caption.copyWith(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: c.warn)),
+                    child: Text(
+                      rx.warn!,
+                      style: AppText.caption.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: c.warn,
+                      ),
+                    ),
                   ),
+                ],
+              ),
+            ),
+          ],
+          if (rx.signatureName.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Divider(height: 1, color: c.border2),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    rx.signatureName,
+                    style: AppText.bodyStrong.copyWith(color: c.text),
+                  ),
+                  if (rx.signatureCredentials.isNotEmpty)
+                    Text(
+                      rx.signatureCredentials,
+                      style: AppText.caption.copyWith(color: c.text2),
+                    ),
+                  if (rx.signatureFooter.isNotEmpty)
+                    Text(
+                      rx.signatureFooter,
+                      style: AppText.caption.copyWith(color: c.text3),
+                    ),
                 ],
               ),
             ),
@@ -278,9 +344,14 @@ class _StatusPill extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Text(active ? 'Active' : 'Past',
-          style: AppText.small.copyWith(
-              fontSize: 11.5, fontWeight: FontWeight.w700, color: fg)),
+      child: Text(
+        active ? 'Active' : 'Past',
+        style: AppText.small.copyWith(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
+      ),
     );
   }
 }

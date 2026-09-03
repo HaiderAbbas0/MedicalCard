@@ -5,7 +5,7 @@ import { Spinner, Empty, Modal, StatusBadge } from '../components/ui';
 
 const ACTIONS: { status: DeletionStatus; label: string; cls: string }[] = [
   { status: 'processing', label: 'Mark processing', cls: 'btn-ghost' },
-  { status: 'completed', label: 'Mark completed', cls: 'btn-success' },
+  { status: 'completed', label: 'Erase account', cls: 'btn-success' },
   { status: 'rejected', label: 'Reject', cls: 'btn-danger' },
 ];
 
@@ -57,7 +57,7 @@ export default function DeletionRequestsPage() {
               <tr>
                 <th>Requested</th>
                 <th>Name</th>
-                <th>CNIC</th>
+                <th>Hayaat ID</th>
                 <th>Reason</th>
                 <th>Status</th>
                 <th />
@@ -68,7 +68,7 @@ export default function DeletionRequestsPage() {
                 <tr key={r.id}>
                   <td className="muted">{new Date(r.requested_at).toLocaleString()}</td>
                   <td>{r.full_name ?? '—'}</td>
-                  <td className="mono">{r.cnic ?? '—'}</td>
+                  <td className="mono">{r.card_number?.replace(/(\d{4})(?=\d)/g, '$1 ') ?? '—'}</td>
                   <td className="muted">{r.reason || '—'}</td>
                   <td><StatusBadge status={r.status} /></td>
                   <td className="actions">
@@ -76,7 +76,7 @@ export default function DeletionRequestsPage() {
                       <button
                         key={a.status}
                         className={`btn ${a.cls} btn-sm`}
-                        disabled={r.status === a.status}
+                        disabled={r.status === a.status || r.status === 'completed' || (a.status === 'completed' && !r.user_id)}
                         onClick={() => begin(r, a.status)}
                       >
                         {a.label}
@@ -92,7 +92,7 @@ export default function DeletionRequestsPage() {
 
       {acting && (
         <Modal
-          title={`Update request — ${acting.req.full_name ?? acting.req.cnic ?? 'user'}`}
+          title={`Update request — ${acting.req.full_name ?? acting.req.card_number ?? 'user'}`}
           onClose={() => setActing(null)}
           footer={
             <>
@@ -100,19 +100,19 @@ export default function DeletionRequestsPage() {
                 Cancel
               </button>
               <button
-                className={acting.status === 'rejected' ? 'btn btn-danger' : 'btn btn-primary'}
+                className={acting.status === 'rejected' ? 'btn btn-danger' : acting.status === 'completed' ? 'btn btn-success' : 'btn btn-primary'}
                 onClick={confirm}
                 disabled={busy}
               >
-                {busy ? 'Saving…' : `Set to ${acting.status}`}
+                {busy ? 'Saving…' : acting.status === 'completed' ? 'Erase account' : `Set to ${acting.status}`}
               </button>
             </>
           }
         >
           {acting.status === 'completed' && (
             <p className="muted">
-              Marking completed records the decision; the account + data are erased by the
-              delete-account Edge Function.
+              This calls the delete-account Edge Function. The request is marked completed only after
+              storage, profile data, and the Supabase Auth user are erased.
             </p>
           )}
           <div className="field">

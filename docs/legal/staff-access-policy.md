@@ -11,7 +11,7 @@ their role in the patient's care, and only while their account is **active and
 approved**. All access is recorded.
 
 ## Role boundaries (enforced by database Row Level Security)
-- **Doctor** — may search a patient by CNIC and view/create clinical records for
+- **Doctor** — may search a patient by Hayaat ID and view/create clinical records for
   patients in their care. Patient-record reads are audit-logged.
 - **Lab worker** — sees only orders routed to their lab, with the patient's
   identity **masked** (first name + last initial). No access to the broader

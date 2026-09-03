@@ -59,7 +59,6 @@ export default function CardDeliveriesPage() {
               <tr>
                 <th>Card No.</th>
                 <th>Name</th>
-                <th>CNIC</th>
                 <th>Address</th>
                 <th>Phone</th>
                 <th>Fee (PKR)</th>
@@ -72,7 +71,6 @@ export default function CardDeliveriesPage() {
                 <tr key={c.id}>
                   <td className="mono">{c.card_number}</td>
                   <td>{c.full_name ?? c.name_en ?? '—'}</td>
-                  <td className="mono">{c.cnic ?? '—'}</td>
                   <td className="muted">{c.delivery_address || '—'}</td>
                   <td className="mono">{c.delivery_phone || '—'}</td>
                   <td>{c.delivery_fee_pkr ?? '—'}</td>

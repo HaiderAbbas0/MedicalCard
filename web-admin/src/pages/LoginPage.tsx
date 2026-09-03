@@ -5,8 +5,8 @@ import { useAuth } from '../auth/AuthContext';
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [identifier, setIdentifier] = useState('3520100000001');
-  const [password, setPassword] = useState('password123');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -29,10 +29,10 @@ export default function LoginPage() {
       <form className="login-card" onSubmit={onSubmit}>
         <img src="/favicon.svg" width={56} height={56} alt="HayaatID" style={{ display: 'block', margin: '0 auto 14px', borderRadius: 14, boxShadow: '0 4px 14px rgba(0,0,0,0.12)' }} />
         <h2 style={{ textAlign: 'center' }}>HayaatID Admin</h2>
-        <p className="sub" style={{ textAlign: 'center' }}>CNIC Health Card System</p>
+        <p className="sub" style={{ textAlign: 'center' }}>HayaatID Health Platform</p>
 
         <div className="field">
-          <label>CNIC or Email</label>
+          <label>CNIC, Hayaat ID, or Email</label>
           <input className="input" value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoFocus />
         </div>
         <div className="field">
@@ -51,7 +51,7 @@ export default function LoginPage() {
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
         <p className="muted" style={{ fontSize: 12, marginTop: 16, textAlign: 'center' }}>
-          Demo admin · CNIC 3520100000001 · password123
+          Authorized administrators only
         </p>
         <p className="muted" style={{ fontSize: 12, marginTop: 8, textAlign: 'center' }}>
           <Link to="/legal/privacy">Privacy Policy</Link> · <Link to="/legal/terms">Terms of Service</Link>

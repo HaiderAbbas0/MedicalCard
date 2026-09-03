@@ -65,14 +65,17 @@ class _OtpScreenState extends State<OtpScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text('Cancel sign-up?'),
         content: const Text(
-            'Are you sure you want to go back? Your progress will be lost and sign-up will be cancelled.'),
+          'Are you sure you want to go back? Your progress will be lost and sign-up will be cancelled.',
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Stay')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Stay'),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Cancel sign-up')),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Cancel sign-up'),
+          ),
         ],
       ),
     );
@@ -86,7 +89,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
   // ── OTP verification & deferred account creation ────────────────────────────
   Future<void> _verify() async {
-    // Demo OTP gate: code must be '11111'.
+    // Development OTP gate. Replace with the configured SMS provider before release.
     if (_code != '11111') {
       _key.currentState?.shake();
       setState(() => _error = true);
@@ -101,24 +104,24 @@ class _OtpScreenState extends State<OtpScreen> {
       if (widget.pendingSignup != null) {
         final data = widget.pendingSignup!;
         final ok = await context.read<AuthController>().signUp(
-              name: data['name'] as String,
-              email: data['email'] as String? ?? '',
-              phone: data['phone'] as String,
-              password: data['password'] as String,
-              gender: data['gender'] as String?,
-              dob: data['dob'] as String?,
-              emergencyPhone: data['emergencyPhone'] as String?,
-            );
+          name: data['name'] as String,
+          email: data['email'] as String? ?? '',
+          cnic: data['cnic'] as String,
+          phone: data['phone'] as String,
+          password: data['password'] as String,
+          gender: data['gender'] as String?,
+          dob: data['dob'] as String?,
+          emergencyPhone: data['emergencyPhone'] as String?,
+        );
 
         if (!mounted) return;
 
         if (!ok) {
           final errMsg =
               context.read<AuthController>().errorMessage ?? 'Sign up failed.';
-          messenger.showSnackBar(SnackBar(
-            content: Text(errMsg),
-            backgroundColor: Colors.red[800],
-          ));
+          messenger.showSnackBar(
+            SnackBar(content: Text(errMsg), backgroundColor: Colors.red[800]),
+          );
           setState(() => _busy = false);
           return;
         }
@@ -128,7 +131,9 @@ class _OtpScreenState extends State<OtpScreen> {
         // here must not block the user from reaching the app.
         try {
           await ComplianceService().recordSignupConsent();
-        } catch (_) {/* non-blocking */}
+        } catch (_) {
+          /* non-blocking */
+        }
       } else {
         // Standalone OTP (e.g. a login step): just complete the existing session.
         await context.read<AuthController>().completeLogin();
@@ -137,10 +142,12 @@ class _OtpScreenState extends State<OtpScreen> {
       if (mounted) context.go('/dashboard');
     } catch (e) {
       if (mounted) {
-        messenger.showSnackBar(SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red[800],
-        ));
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red[800],
+          ),
+        );
         setState(() => _busy = false);
       }
     }
@@ -168,10 +175,12 @@ class _OtpScreenState extends State<OtpScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Back button also triggers the confirmation dialog.
-                _BackButton(onTap: () async {
-                  final shouldPop = await _onWillPop();
-                  if (shouldPop && context.mounted) context.pop();
-                }),
+                _BackButton(
+                  onTap: () async {
+                    final shouldPop = await _onWillPop();
+                    if (shouldPop && context.mounted) context.pop();
+                  },
+                ),
                 const SizedBox(height: 28),
                 Container(
                   width: 62,
@@ -198,10 +207,8 @@ class _OtpScreenState extends State<OtpScreen> {
                     style: AppText.body.copyWith(color: c.text2),
                     children: [
                       const TextSpan(
-                          text: 'We sent a 5-digit code to your phone. '),
-                      TextSpan(
-                        text: 'Demo code: 11111',
-                        style: AppText.bodyStrong.copyWith(color: c.primary),
+                        text:
+                            'Enter the 5-digit verification code sent to your phone.',
                       ),
                     ],
                   ),
@@ -223,7 +230,9 @@ class _OtpScreenState extends State<OtpScreen> {
                   ),
                 ],
                 const SizedBox(height: 24),
-                Center(child: _ResendLine(seconds: _seconds, onResend: _startTimer)),
+                Center(
+                  child: _ResendLine(seconds: _seconds, onResend: _startTimer),
+                ),
                 const SizedBox(height: 24),
                 GradientButton(
                   label: 'Verify & create account',
@@ -260,8 +269,10 @@ class _ResendLine extends StatelessWidget {
       semanticLabel: 'Resend code',
       child: Text(
         'Didn\'t get it? Resend code',
-        style:
-            AppText.caption.copyWith(color: c.primary, fontWeight: FontWeight.w700),
+        style: AppText.caption.copyWith(
+          color: c.primary,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

@@ -15,7 +15,7 @@ export default function LegalLayout({ title, children }: { title: string; childr
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <span style={{ fontSize: 22 }}>✚</span>
-          <strong style={{ fontSize: 15 }}>HayaatID · SehatID</strong>
+          <strong style={{ fontSize: 15 }}>HayaatID</strong>
         </div>
         <h1 style={{ fontSize: 28, margin: '4px 0 4px' }}>{title}</h1>
         <p className="muted" style={{ marginTop: 0 }}>

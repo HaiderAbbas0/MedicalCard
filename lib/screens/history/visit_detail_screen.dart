@@ -29,7 +29,7 @@ class VisitDetailScreen extends StatelessWidget {
               dx: 'Unknown Visit',
               doctor: 'Unknown Doctor',
               specialty: 'General Medicine',
-              hospital: 'Sehat Clinic',
+              hospital: 'Clinic',
               dateLabel: 'Today',
               time: '00:00',
               symptoms: 'No symptoms recorded.',
@@ -176,10 +176,17 @@ class VisitDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 GradientButton(
-                  label: 'Download prescription',
+                  label: 'View prescription',
                   height: 52,
-                  onPressed: () =>
-                      _snack(context, 'Prescription downloaded'),
+                  onPressed: () {
+                    final targetId = 'prescription-${v.id}';
+                    final exists = records.medicalRecords.any((m) => m.id == targetId);
+                    if (exists) {
+                      context.push('/record/${Uri.encodeComponent(targetId)}');
+                    } else {
+                      _snack(context, 'No prescription document is available for this visit.');
+                    }
+                  },
                 ),
               ],
             ),

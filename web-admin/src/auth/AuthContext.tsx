@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { supabase, emailFor, fetchFullProfile } from '../api/supabase';
+import { supabase, resolveLoginEmail, fetchFullProfile } from '../api/supabase';
 import type { Profile } from '../api/types';
 
 interface AuthState {
@@ -29,10 +29,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function login(identifier: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({
-      email: emailFor(identifier),
+      email: await resolveLoginEmail(identifier),
       password,
     });
-    if (error) throw new Error(error.message.includes('Invalid') ? 'Invalid CNIC or password.' : error.message);
+    if (error) throw new Error(error.message.includes('Invalid') ? 'Invalid Hayaat ID or password.' : error.message);
 
     const uid = (await supabase.auth.getUser()).data.user?.id;
     const profile = uid ? await fetchFullProfile(uid) : null;

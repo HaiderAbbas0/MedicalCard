@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/auth_controller.dart';
+import '../../services/auth_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/gradient_button.dart';
@@ -23,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isPatient = true;
   bool _obscure = true;
   bool _showError = false;
+  bool _resetBusy = false;
 
   @override
   void dispose() {
@@ -47,10 +49,30 @@ class _LoginScreenState extends State<LoginScreen> {
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(authController.errorMessage ?? 'Login failed. Please try again.'),
+          content: Text(
+            authController.errorMessage ?? 'Login failed. Please try again.',
+          ),
           backgroundColor: Colors.red[800],
         ),
       );
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    setState(() => _resetBusy = true);
+    try {
+      await AuthService().sendPasswordReset(_idCtrl.text);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset email sent if the account exists.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      if (mounted) setState(() => _resetBusy = false);
     }
   }
 
@@ -79,20 +101,40 @@ class _LoginScreenState extends State<LoginScreen> {
                       border: Border.all(color: c.border),
                       boxShadow: AppShadows.card,
                     ),
-                    child: SvgPicture.asset('assets/images/hayaat_logo.svg', width: 36, height: 36),
+                    child: SvgPicture.asset(
+                      'assets/images/hayaat_logo.svg',
+                      width: 36,
+                      height: 36,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Text.rich(
-                    TextSpan(children: [
-                      TextSpan(text: 'Hayaat', style: AppText.display.copyWith(color: c.text, fontSize: 24)),
-                      TextSpan(text: 'ID', style: AppText.display.copyWith(color: c.primary, fontSize: 24)),
-                    ]),
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Hayaat',
+                          style: AppText.display.copyWith(
+                            color: c.text,
+                            fontSize: 24,
+                          ),
+                        ),
+                        TextSpan(
+                          text: 'ID',
+                          style: AppText.display.copyWith(
+                            color: c.primary,
+                            fontSize: 24,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              Text('Welcome back',
-                  style: AppText.display.copyWith(color: c.text, fontSize: 26)),
+              Text(
+                'Welcome back',
+                style: AppText.display.copyWith(color: c.text, fontSize: 26),
+              ),
               const SizedBox(height: 6),
               Text(
                 'Sign in to your HayaatID account',
@@ -104,12 +146,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 onChanged: (v) => setState(() => _isPatient = v),
               ),
               const SizedBox(height: 20),
-              _FieldLabel('Unique ID'),
+              _FieldLabel('CNIC, Hayaat ID, email, or phone'),
               const SizedBox(height: 8),
               _Field(
                 controller: _idCtrl,
                 icon: Icons.badge_outlined,
-                hint: 'e.g. HAY-PAT-0001',
+                hint: '3520112345671',
                 hasError: idEmpty,
                 onChanged: (_) {
                   if (_showError) setState(() => _showError = false);
@@ -132,15 +174,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   semanticLabel: _obscure ? 'Show password' : 'Hide password',
                   child: Text(
                     _obscure ? 'Show' : 'Hide',
-                    style: AppText.caption
-                        .copyWith(color: c.primary, fontWeight: FontWeight.w700),
+                    style: AppText.caption.copyWith(
+                      color: c.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
               if (_showError) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Please enter your Unique ID and password.',
+                  'Please enter your CNIC, Hayaat ID, email, or phone and password.',
                   style: AppText.caption.copyWith(color: c.danger),
                 ),
               ],
@@ -148,12 +192,14 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: PressScale(
-                  onTap: () {},
+                  onTap: _resetBusy ? null : _forgotPassword,
                   semanticLabel: 'Forgot password',
                   child: Text(
-                    'Forgot password?',
-                    style: AppText.caption
-                        .copyWith(color: c.primary, fontWeight: FontWeight.w700),
+                    _resetBusy ? 'Sending reset…' : 'Forgot password?',
+                    style: AppText.caption.copyWith(
+                      color: c.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -161,7 +207,9 @@ class _LoginScreenState extends State<LoginScreen> {
               Consumer<AuthController>(
                 builder: (context, auth, child) {
                   return GradientButton(
-                    label: _isPatient ? 'Sign in as Patient' : 'Sign in as Staff',
+                    label: _isPatient
+                        ? 'Sign in as Patient'
+                        : 'Sign in as Staff',
                     loading: auth.isLoading,
                     onPressed: _signIn,
                   );
@@ -170,16 +218,18 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 18),
               _InfoBanner(
                 text: _isPatient
-                    ? 'Sign in with your HayaatID Unique ID and password.'
-                    : 'Staff (doctor, lab worker, receptionist) sign in with their HayaatID Unique ID.',
+                    ? 'Sign in with your 13-digit CNIC, your 16-digit Hayaat ID, email, or phone.'
+                    : 'Staff sign in with their CNIC, Hayaat ID, approved email, or Employee ID.',
               ),
               const SizedBox(height: 24),
               Center(
                 child: Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text('New here? ',
-                        style: AppText.body.copyWith(color: c.text2)),
+                    Text(
+                      'New here? ',
+                      style: AppText.body.copyWith(color: c.text2),
+                    ),
                     PressScale(
                       onTap: () => context.push('/signup'),
                       semanticLabel: 'Create account',
@@ -243,10 +293,7 @@ class _Field extends StatelessWidget {
       decoration: BoxDecoration(
         color: c.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: hasError ? c.danger : c.primary,
-          width: 1.5,
-        ),
+        border: Border.all(color: hasError ? c.danger : c.primary, width: 1.5),
       ),
       child: Row(
         children: [
@@ -266,10 +313,7 @@ class _Field extends StatelessWidget {
               ),
             ),
           ),
-          if (trailing != null) ...[
-            const SizedBox(width: 8),
-            trailing!,
-          ],
+          if (trailing != null) ...[const SizedBox(width: 8), trailing!],
         ],
       ),
     );
@@ -302,7 +346,11 @@ class _Segmented extends StatelessWidget {
   }
 
   Widget _segment(
-      BuildContext context, String label, bool selected, VoidCallback onTap) {
+    BuildContext context,
+    String label,
+    bool selected,
+    VoidCallback onTap,
+  ) {
     final c = context.c;
     return Expanded(
       child: PressScale(
@@ -358,4 +406,3 @@ class _InfoBanner extends StatelessWidget {
     );
   }
 }
-

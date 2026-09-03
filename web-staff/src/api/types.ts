@@ -5,7 +5,10 @@ export type AccountStatus = 'active' | 'pending' | 'suspended' | 'rejected';
 
 export interface Profile {
   id: string;
-  cnic: string;
+  /** 13-digit CNIC — citizen identity used for login and staff lookup. */
+  cnic: string | null;
+  /** 16-digit Hayaat number printed on the health card. */
+  card_number: string;
   full_name: string;
   email: string | null;
   phone_primary: string;
@@ -35,7 +38,8 @@ export interface Appointment {
 export interface PatientSummary {
   id: string;
   full_name: string;
-  cnic: string;
+  cnic: string | null;
+  card_number: string;
   gender?: string;
   date_of_birth?: string;
   blood_group?: string;
@@ -85,7 +89,7 @@ export interface ChatConversation {
   last_message: string | null;
   last_message_at: string | null;
   created_at: string;
-  patient?: { id: string; full_name: string; cnic: string } | null;
+  patient?: { id: string; full_name: string; card_number: string } | null;
   unread: number;
 }
 
@@ -117,7 +121,7 @@ export interface ClinicAppointment {
   appointment_time: string;
   appointment_type: string;
   doctor_name?: string | null;
-  patient?: { id: string; full_name: string; cnic: string; phone_primary: string } | null;
+  patient?: { id: string; full_name: string; card_number: string; phone_primary: string } | null;
 }
 
 export interface ClinicDoctor {

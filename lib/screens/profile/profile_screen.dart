@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../controllers/auth_controller.dart';
 import '../../controllers/card_controller.dart';
-import '../../data/mock_data.dart';
+import '../../data/mock_data.dart' show UserPatientExtension;
 import '../../services/card_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -19,11 +19,16 @@ class ProfileScreen extends StatelessWidget {
     final cardCtrl = context.read<CardController>();
     if (cardCtrl.card == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Request your card first to add a photo.')),
+        const SnackBar(
+          content: Text('Request your card first to add a photo.'),
+        ),
       );
       return;
     }
-    final res = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+    final res = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
     if (res == null || res.files.single.bytes == null) return;
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -32,7 +37,9 @@ class ProfileScreen extends StatelessWidget {
       await cardCtrl.load(); // refresh card → keeps profile + card in sync
       messenger.showSnackBar(const SnackBar(content: Text('Photo updated.')));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Could not update photo: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not update photo: $e')),
+      );
     }
   }
 
@@ -41,7 +48,16 @@ class ProfileScreen extends StatelessWidget {
     final c = context.c;
     final auth = context.watch<AuthController>();
     final cardCtrl = context.watch<CardController>();
-    final p = auth.currentUser?.toPatient() ?? mockPatient;
+    final p = auth.currentUser?.toPatient();
+    if (p == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            'Your patient profile could not be loaded. Please sign in again.',
+          ),
+        ),
+      );
+    }
     final photoUrl = cardCtrl.card?.photoUrl;
     final uniqueId = auth.currentUser?.cardNumber ?? p.healthId;
     final email = auth.currentUser?.email ?? '—';
@@ -71,8 +87,11 @@ class ProfileScreen extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.settings_rounded,
-                          color: Colors.white, size: 20),
+                      child: const Icon(
+                        Icons.settings_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
                   ),
                 ),
@@ -88,13 +107,25 @@ class ProfileScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.2),
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 3),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              width: 3,
+                            ),
                             image: (photoUrl != null && photoUrl.isNotEmpty)
-                                ? DecorationImage(image: NetworkImage(photoUrl), fit: BoxFit.cover)
+                                ? DecorationImage(
+                                    image: NetworkImage(photoUrl),
+                                    fit: BoxFit.cover,
+                                  )
                                 : null,
                           ),
                           child: (photoUrl == null || photoUrl.isEmpty)
-                              ? Text(p.initials, style: AppText.display.copyWith(fontSize: 30, color: Colors.white))
+                              ? Text(
+                                  p.initials,
+                                  style: AppText.display.copyWith(
+                                    fontSize: 30,
+                                    color: Colors.white,
+                                  ),
+                                )
                               : null,
                         ),
                         Positioned(
@@ -107,18 +138,36 @@ class ProfileScreen extends StatelessWidget {
                               width: 30,
                               height: 30,
                               alignment: Alignment.center,
-                              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                              child: Icon(Icons.camera_alt_rounded, size: 16, color: c.primary),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.camera_alt_rounded,
+                                size: 16,
+                                color: c.primary,
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Text(p.name, style: AppText.display.copyWith(fontSize: 22, color: Colors.white)),
+                    Text(
+                      p.name,
+                      style: AppText.display.copyWith(
+                        fontSize: 22,
+                        color: Colors.white,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(uniqueId,
-                        style: AppText.mono.copyWith(fontSize: 13, color: Colors.white.withValues(alpha: 0.9))),
+                    Text(
+                      uniqueId,
+                      style: AppText.mono.copyWith(
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -138,11 +187,27 @@ class ProfileScreen extends StatelessWidget {
                   mainAxisSpacing: 11,
                   childAspectRatio: 2.1,
                   children: [
-                    _FactCard(label: 'UNIQUE ID', value: uniqueId, valueSize: 14),
-                    _FactCard(label: 'BLOOD GROUP', value: p.blood, valueColor: c.danger),
-                    _FactCard(label: 'DATE OF BIRTH', value: p.dob, valueSize: 15),
+                    _FactCard(
+                      label: 'HAYAAT ID',
+                      value: uniqueId,
+                      valueSize: 14,
+                    ),
+                    _FactCard(
+                      label: 'BLOOD GROUP',
+                      value: p.blood,
+                      valueColor: c.danger,
+                    ),
+                    _FactCard(
+                      label: 'DATE OF BIRTH',
+                      value: p.dob,
+                      valueSize: 15,
+                    ),
                     _FactCard(label: 'GENDER', value: p.gender),
-                    _FactCard(label: 'PHONE', value: p.phoneMasked, valueSize: 15),
+                    _FactCard(
+                      label: 'PHONE',
+                      value: p.phoneMasked,
+                      valueSize: 15,
+                    ),
                     _FactCard(label: 'EMAIL', value: email, valueSize: 13),
                   ],
                 ),
@@ -178,23 +243,33 @@ class ProfileScreen extends StatelessWidget {
                           color: c.dangerBg,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(Icons.notifications_active_rounded,
-                            size: 20, color: c.danger),
+                        child: Icon(
+                          Icons.notifications_active_rounded,
+                          size: 20,
+                          color: c.danger,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('EMERGENCY CONTACT',
-                                style: AppText.small.copyWith(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: c.text3)),
+                            Text(
+                              'EMERGENCY CONTACT',
+                              style: AppText.small.copyWith(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: c.text3,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            Text('${p.emergencyName} · ${p.emergencyPhone}',
-                                style: AppText.bodyStrong.copyWith(
-                                    fontSize: 15, color: c.text)),
+                            Text(
+                              '${p.emergencyName} · ${p.emergencyPhone}',
+                              style: AppText.bodyStrong.copyWith(
+                                fontSize: 15,
+                                color: c.text,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -243,18 +318,24 @@ class _FactCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(label,
-              style: AppText.small.copyWith(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: c.text3)),
+          Text(
+            label,
+            style: AppText.small.copyWith(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: c.text3,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(value,
-              style: AppText.bodyStrong.copyWith(
-                  fontSize: valueSize,
-                  fontWeight: FontWeight.w800,
-                  color: valueColor ?? c.text),
-              overflow: TextOverflow.ellipsis),
+          Text(
+            value,
+            style: AppText.bodyStrong.copyWith(
+              fontSize: valueSize,
+              fontWeight: FontWeight.w800,
+              color: valueColor ?? c.text,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
@@ -288,11 +369,14 @@ class _ChipsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: AppText.small.copyWith(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: c.text3)),
+          Text(
+            label,
+            style: AppText.small.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: c.text3,
+            ),
+          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -300,15 +384,21 @@ class _ChipsCard extends StatelessWidget {
             children: [
               for (final item in items)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 13,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: bg,
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: Text(item,
-                      style: AppText.caption.copyWith(
-                          fontWeight: FontWeight.w700, color: fg)),
+                  child: Text(
+                    item,
+                    style: AppText.caption.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: fg,
+                    ),
+                  ),
                 ),
             ],
           ),

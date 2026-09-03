@@ -14,6 +14,18 @@
 -- Patient rows: only the owner or staff. Provider rows (doctor/lab/reception)
 -- stay readable so patients can see "Dr. X", clinic staff names, etc.
 -- Admin rows: only self or staff.
+create table if not exists public.audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid,
+  actor_role varchar(20),
+  action varchar(50),
+  resource_type varchar(50),
+  resource_id uuid,
+  patient_id uuid,
+  status varchar(20) default 'success',
+  timestamp timestamptz not null default now()
+);
+
 drop policy if exists p_profiles_sel on public.profiles;
 create policy p_profiles_sel on public.profiles for select to authenticated
   using (
@@ -134,8 +146,8 @@ begin
   end if;
   cnum := public.gen_card_number(r);
 
-  insert into public.profiles (id, auth_user_id, cnic, full_name, date_of_birth, gender, phone_primary, email, role, status, card_number)
-  values (new.id, new.id, m->>'cnic', coalesce(m->>'full_name',''), nullif(m->>'date_of_birth','')::date,
+  insert into public.profiles (id, auth_user_id, full_name, date_of_birth, gender, phone_primary, email, role, status, card_number)
+  values (new.id, new.id, coalesce(m->>'full_name',''), nullif(m->>'date_of_birth','')::date,
           m->>'gender', coalesce(m->>'phone',''), nullif(m->>'email',''), r,
           case when r='doctor' then 'pending' else 'active' end, cnum);
 

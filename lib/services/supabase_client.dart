@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Central Supabase configuration + helpers for the HayaatID app.
 class SupabaseConfig {
   /// Supabase project URL. Overridable at build time with
-  /// `--dart-define=SUPABASE_URL=...`; defaults to the shared dev/demo project.
+  /// `--dart-define=SUPABASE_URL=...`; defaults to the shared development project.
   static const String url = String.fromEnvironment(
     'SUPABASE_URL',
     defaultValue: 'https://iikwdtiqvxxatrzahuzo.supabase.co',
@@ -20,8 +20,7 @@ class SupabaseConfig {
   static const String anonKey =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpa3dkdGlxdnh4YXRyemFodXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MjU2ODcsImV4cCI6MjA5ODMwMTY4N30.fdv7ntuU30nevZf9QPKZ2QELc8PY1GvJK5hfneQ3dbA';
 
-  /// Login uses a Unique ID (HAY-…) + password; this maps a CNIC to its
-  /// deterministic auth email (used for newly-created staff before login).
+  /// Maps a phone-only login to its deterministic internal auth email.
   static String emailFor(String identifier) {
     final id = identifier.trim();
     return id.contains('@') ? id : '$id@hayaat.id';
@@ -38,7 +37,7 @@ SupabaseClient get db => Supabase.instance.client;
 /// Current signed-in auth user id (profiles.id == auth.users.id).
 String? get currentUid => db.auth.currentUser?.id;
 
-/// Resolve a login identifier (Unique ID / CNIC / phone) to its auth email.
+/// Resolve a login identifier (Hayaat ID / email / phone / employee ID).
 Future<String?> resolveLoginEmail(String identifier) async {
   final res = await db.rpc('login_email', params: {'p_id': identifier.trim()});
   return res as String?;
@@ -47,7 +46,11 @@ Future<String?> resolveLoginEmail(String identifier) async {
 /// Fetch a full profile (base row + role-extended row) shaped like the old API
 /// `/me` response, i.e. `{ ...base, extended: {...} }`.
 Future<Map<String, dynamic>?> fetchFullProfile(String userId) async {
-  final base = await db.from('profiles').select().eq('id', userId).maybeSingle();
+  final base = await db
+      .from('profiles')
+      .select()
+      .eq('id', userId)
+      .maybeSingle();
   if (base == null) return null;
 
   const extTable = {

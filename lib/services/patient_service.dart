@@ -41,6 +41,17 @@ class PatientService {
     return rows.cast<Map<String, dynamic>>();
   }
 
+  Future<List<Map<String, dynamic>>> availableAppointmentSlots({
+    required String doctorId,
+    required String date,
+  }) async {
+    final rows = await db.rpc('available_appointment_slots', params: {
+      'p_doctor': doctorId,
+      'p_date': date,
+    }) as List;
+    return rows.cast<Map<String, dynamic>>();
+  }
+
   Future<List<AppointmentModel>> myAppointments() async {
     final uid = currentUid;
     if (uid == null) return [];
@@ -64,18 +75,13 @@ class PatientService {
     String type = 'in_person',
     String? notes,
   }) async {
-    final uid = currentUid;
-    await db.from('appointments').insert({
-      'patient_id': uid,
-      'doctor_id': doctorId,
-      if (clinicId != null) 'clinic_id': clinicId,
-      'appointment_date': date,
-      'appointment_time': time,
-      'appointment_type': type,
-      'status': 'pending',
-      'booked_by_role': 'patient',
-      'booked_by_id': uid,
-      if (notes != null) 'notes_for_doctor': notes,
+    await db.rpc('request_patient_appointment', params: {
+      'p_doctor': doctorId,
+      'p_date': date,
+      'p_time': time,
+      'p_clinic': clinicId,
+      'p_type': type,
+      'p_notes': notes,
     });
     // The doctor is notified by the `trg_notify_doctor_appt` DB trigger
     // (see supabase/security.sql) — clients can no longer write notifications

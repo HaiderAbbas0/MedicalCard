@@ -1,6 +1,6 @@
-# CNIC Health Card — Staff Web Portal
+# HayaatID — Staff Web Portal
 
-React + TypeScript (Vite) web portal for **clinic staff** of the CNIC Health Card
+React + TypeScript (Vite) web portal for **clinic staff** of the HayaatID
 System: **doctors, lab workers, and receptionists**. One login, role-routed into
 the right workspace. (Administrators use the separate `web-admin/` app; patients
 use the Flutter mobile app at `/lib`.)
@@ -25,7 +25,7 @@ Doctors can self-register at `/register-doctor` (account is created pending admi
 
 ## Workspaces
 
-**Doctor** — today's appointments (confirm/check-in/no-show); find patient by CNIC;
+**Doctor** — today's appointments (confirm/check-in/no-show); find patient by Hayaat ID;
 patient record (summary, allergies, conditions, consolidated meds, timeline, record
 allergy); new encounter (diagnoses, meds with live allergy warning, vitals, lab
 orders, follow-up, finalize); lab results review & release; weekly availability;
@@ -36,7 +36,7 @@ identity); mark sample collected → processing; upload result file (real upload
 25 MB limit) or structured values; uploading notifies the ordering doctor.
 
 **Receptionist** — clinic schedule for all doctors; check-in; cancel; book a
-walk-in appointment (search patient by CNIC → pick doctor → date/time).
+walk-in appointment (search patient by Hayaat ID → pick doctor → date/time).
 
 ## Structure
 

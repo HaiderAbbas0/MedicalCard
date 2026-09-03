@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/record_controller.dart';
@@ -109,7 +110,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         for (final r in groups[k]!) ...[
                           _ReportCard(
                             report: r,
-                            onDownload: () => _snack(context, 'Downloading ${r.name}…'),
+                            onDownload: () {
+                              final targetId = 'lab-${r.id}';
+                              final exists = records.medicalRecords.any((m) => m.id == targetId);
+                              if (exists) {
+                                context.push('/record/${Uri.encodeComponent(targetId)}');
+                              } else {
+                                _snack(context, 'Original report is not available yet.');
+                              }
+                            },
                           ),
                           const SizedBox(height: 12),
                         ],

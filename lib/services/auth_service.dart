@@ -28,9 +28,11 @@ class NetworkException extends ApiException {
   NetworkException(super.message);
 }
 
-/// Authentication backed by Supabase Auth. Login uses CNIC + password.
+/// Authentication backed by Supabase Auth. Login accepts the citizen's
+/// 13-digit CNIC, their 16-digit Hayaat ID, email, phone, or a staff
+/// employee ID — all resolved server-side by the `login_email` RPC.
 class AuthService {
-  /// Sign in with a Unique ID (HAY-…) — also accepts CNIC/phone — + password.
+  /// Sign in with a CNIC, Hayaat ID, email, or phone + password.
   Future<AuthResponse> login(String identifier, String password) async {
     String? email;
     try {
@@ -38,18 +40,21 @@ class AuthService {
     } catch (_) {
       email = null;
     }
-    // Fall back to the deterministic mapping (covers email/CNIC entered directly).
+    // Fall back to the deterministic mapping for phone-only accounts.
     email ??= SupabaseConfig.emailFor(identifier);
     try {
       await db.auth.signInWithPassword(email: email, password: password);
     } on AuthException catch (e) {
       throw UnauthorizedException(_friendly(e.message));
     } catch (e) {
-      throw NetworkException('Could not reach the server. Check your connection.');
+      throw NetworkException(
+        'Could not reach the server. Check your connection.',
+      );
     }
 
     final uid = currentUid;
-    if (uid == null) throw UnauthorizedException('Login failed. Please try again.');
+    if (uid == null)
+      throw UnauthorizedException('Login failed. Please try again.');
 
     final profile = await fetchFullProfile(uid);
     if (profile == null) {
@@ -58,7 +63,10 @@ class AuthService {
     }
 
     _gateStatus(profile['status'] as String?, profile['role'] as String?);
-    return AuthResponse(token: db.auth.currentSession?.accessToken ?? '', user: UserModel.fromJson(profile));
+    return AuthResponse(
+      token: db.auth.currentSession?.accessToken ?? '',
+      user: UserModel.fromJson(profile),
+    );
   }
 
   /// Register a new patient. Returns a session (auto sign-in).
@@ -66,25 +74,32 @@ class AuthService {
     required String name,
     required String email,
     required String password,
-    String? cnic,
+    required String cnic,
     String? phone,
     String? dob,
     String? gender,
     String? bloodGroup,
     String? emergencyPhone,
   }) async {
-    // Phone is the login identity for patients (email is optional contact info).
+    // Use the patient's real email as the Auth identity when supplied. Phone-only
+    // registrations retain the deterministic @hayaat.id alias.
     if (phone == null || phone.trim().length < 7) {
       throw BadRequestException('A valid phone number is required.');
     }
-    final authEmail = SupabaseConfig.emailFor(phone.replaceAll(RegExp(r'\D'), ''));
+    final cnicDigits = cnic.replaceAll(RegExp(r'\D'), '');
+    if (cnicDigits.length != 13) {
+      throw BadRequestException('CNIC must be exactly 13 digits.');
+    }
+    final authEmail = email.trim().isNotEmpty
+        ? email.trim().toLowerCase()
+        : SupabaseConfig.emailFor(phone.replaceAll(RegExp(r'\D'), ''));
     try {
       await db.auth.signUp(
         email: authEmail,
         password: password,
         data: {
           'role': 'patient',
-          if (cnic != null && cnic.trim().isNotEmpty) 'cnic': cnic.trim(),
+          'cnic': cnicDigits,
           'full_name': name,
           'phone': phone.trim(),
           if (email.isNotEmpty) 'email': email,
@@ -95,25 +110,29 @@ class AuthService {
         },
       );
     } on AuthException catch (e) {
-      throw BadRequestException(_friendly(e.message));
+      throw BadRequestException(_friendly(e.message, isPhone: true));
     }
 
     if (db.auth.currentSession == null) {
       throw BadRequestException(
-          'Account created, but email confirmation is on. Disable "Confirm email" in Supabase Auth settings.');
+        'Account created, but email confirmation is on. Disable "Confirm email" in Supabase Auth settings.',
+      );
     }
     final profile = await _profileWithRetry(currentUid!);
-    return AuthResponse(token: db.auth.currentSession?.accessToken ?? '', user: UserModel.fromJson(profile));
+    return AuthResponse(
+      token: db.auth.currentSession?.accessToken ?? '',
+      user: UserModel.fromJson(profile),
+    );
   }
 
   /// Register a doctor — created PENDING. No session is kept (admin must approve).
   Future<String> registerDoctor({
     required String fullName,
     required String password,
+    required String cnic,
     required String pmdcNumber,
     required String specialization,
     required String phone,
-    String? cnic,
     String? gender,
     String? dob,
     String? clinicId,
@@ -124,15 +143,22 @@ class AuthService {
     int? yearsExperience,
     num? consultationFee,
   }) async {
-    if (phone.trim().length < 7) throw BadRequestException('A valid phone number is required.');
-    final authEmail = SupabaseConfig.emailFor(phone.replaceAll(RegExp(r'\D'), ''));
+    if (phone.trim().length < 7)
+      throw BadRequestException('A valid phone number is required.');
+    final cnicDigits = cnic.replaceAll(RegExp(r'\D'), '');
+    if (cnicDigits.length != 13) {
+      throw BadRequestException('CNIC must be exactly 13 digits.');
+    }
+    final authEmail = SupabaseConfig.emailFor(
+      phone.replaceAll(RegExp(r'\D'), ''),
+    );
     try {
       await db.auth.signUp(
         email: authEmail,
         password: password,
         data: {
           'role': 'doctor',
-          if (cnic != null && cnic.trim().isNotEmpty) 'cnic': cnic.trim(),
+          'cnic': cnicDigits,
           'full_name': fullName,
           'phone': phone.trim(),
           if (gender != null) 'gender': gender,
@@ -146,7 +172,7 @@ class AuthService {
         },
       );
     } on AuthException catch (e) {
-      throw BadRequestException(_friendly(e.message));
+      throw BadRequestException(_friendly(e.message, isPhone: true));
     }
     // Doctors cannot use the app until an admin approves them.
     await db.auth.signOut();
@@ -155,15 +181,37 @@ class AuthService {
 
   Future<void> signOut() => db.auth.signOut();
 
+  Future<void> sendPasswordReset(String identifier) async {
+    final clean = identifier.trim();
+    if (clean.isEmpty) {
+      throw BadRequestException('Enter your CNIC, Hayaat ID, email, or phone first.');
+    }
+    String? email;
+    try {
+      email = await resolveLoginEmail(clean);
+    } catch (_) {
+      email = null;
+    }
+    email ??= clean.contains('@') ? clean : null;
+    if (email == null) {
+      throw BadRequestException('Enter the email attached to your account.');
+    }
+    await db.auth.resetPasswordForEmail(email);
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────
   void _gateStatus(String? status, String? role) {
     if (status == 'pending') {
       db.auth.signOut();
-      throw UnauthorizedException('Your account is pending approval by an administrator.');
+      throw UnauthorizedException(
+        'Your account is pending approval by an administrator.',
+      );
     }
     if (status == 'suspended') {
       db.auth.signOut();
-      throw UnauthorizedException('This account has been suspended. Contact an administrator.');
+      throw UnauthorizedException(
+        'This account has been suspended. Contact an administrator.',
+      );
     }
     if (status == 'rejected') {
       db.auth.signOut();
@@ -177,14 +225,21 @@ class AuthService {
       await Future.delayed(const Duration(milliseconds: 400));
       profile = await fetchFullProfile(uid);
     }
-    return profile ?? {'id': uid, 'role': 'patient', 'full_name': '', 'extended': {}};
+    return profile ??
+        {'id': uid, 'role': 'patient', 'full_name': '', 'extended': {}};
   }
 
-  String _friendly(String raw) {
+  String _friendly(String raw, {bool isPhone = false}) {
     final m = raw.toLowerCase();
     if (m.contains('invalid login')) return 'Invalid CNIC or password.';
+    if (m.contains('cnic is already registered')) {
+      return 'An account is already registered with this CNIC.';
+    }
+    if (m.contains('cnic must be exactly')) return 'CNIC must be exactly 13 digits.';
     if (m.contains('already registered') || m.contains('already exists')) {
-      return 'An account with this CNIC already exists.';
+      return isPhone
+          ? 'An account with this phone number already exists.'
+          : 'An account with this email or phone already exists.';
     }
     return raw;
   }

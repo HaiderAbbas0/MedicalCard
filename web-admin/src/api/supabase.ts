@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configured per environment via Vite env vars (see .env.example). The defaults
-// below are the shared dev/demo project's *publishable* key — safe to ship because
+// below are the shared development project's *publishable* key — safe to ship because
 // Row Level Security enforces all access. Production builds MUST set VITE_SUPABASE_*.
 export const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL ?? 'https://iikwdtiqvxxatrzahuzo.supabase.co';
@@ -12,10 +12,14 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: { storageKey: 'hayaat_admin_auth', persistSession: true, autoRefreshToken: true },
 });
 
-/** CNIC/email → auth email (CNIC maps to <digits>@hayaat.id). */
-export function emailFor(identifier: string): string {
+/** Resolve Hayaat ID/email/employee ID to the underlying Auth email. */
+export async function resolveLoginEmail(identifier: string): Promise<string> {
   const id = identifier.trim();
-  return id.includes('@') ? id : `${id.replace(/\D/g, '')}@hayaat.id`;
+  if (id.includes('@')) return id.toLowerCase();
+  const { data, error } = await supabase.rpc('login_email', { p_id: id });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('Invalid Hayaat ID or email.');
+  return data as string;
 }
 
 /** Fetch a full profile (base + role-extended) for a user id. */

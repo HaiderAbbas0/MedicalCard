@@ -21,12 +21,7 @@ class MedModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'strength': strength,
-      'freq': freq,
-      'dur': dur,
-    };
+    return {'name': name, 'strength': strength, 'freq': freq, 'dur': dur};
   }
 }
 
@@ -118,6 +113,11 @@ class PrescriptionModel {
   final bool evening;
   final bool night;
   final int? durationDays;
+  final String route;
+  final String instructions;
+  final String signatureName;
+  final String signatureCredentials;
+  final String signatureFooter;
 
   PrescriptionModel({
     required this.id,
@@ -134,15 +134,20 @@ class PrescriptionModel {
     this.evening = false,
     this.night = false,
     this.durationDays,
+    this.route = '',
+    this.instructions = '',
+    this.signatureName = '',
+    this.signatureCredentials = '',
+    this.signatureFooter = '',
   });
 
   /// Dose labels enabled for this medication, in order.
   List<String> get doseLabels => [
-        if (morning) 'morning',
-        if (afternoon) 'afternoon',
-        if (evening) 'evening',
-        if (night) 'night',
-      ];
+    if (morning) 'morning',
+    if (afternoon) 'afternoon',
+    if (evening) 'evening',
+    if (night) 'night',
+  ];
 
   factory PrescriptionModel.fromJson(Map<String, dynamic> json) {
     return PrescriptionModel(
@@ -155,6 +160,11 @@ class PrescriptionModel {
       date: json['date'] as String,
       active: json['active'] as bool,
       warn: json['warn'] as String?,
+      route: json['route'] as String? ?? '',
+      instructions: json['instructions'] as String? ?? '',
+      signatureName: json['signatureName'] as String? ?? '',
+      signatureCredentials: json['signatureCredentials'] as String? ?? '',
+      signatureFooter: json['signatureFooter'] as String? ?? '',
     );
   }
 
@@ -169,6 +179,11 @@ class PrescriptionModel {
       'date': date,
       'active': active,
       'warn': warn,
+      'route': route,
+      'instructions': instructions,
+      'signatureName': signatureName,
+      'signatureCredentials': signatureCredentials,
+      'signatureFooter': signatureFooter,
     };
   }
 }
@@ -201,12 +216,78 @@ class ReportModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'lab': lab,
-      'date': date,
-      'status': status,
-    };
+    return {'id': id, 'name': name, 'lab': lab, 'date': date, 'status': status};
   }
+}
+
+enum MedicalRecordType {
+  prescription('Doctor prescription'),
+  laboratory('Laboratory test report'),
+  imaging('Imaging report'),
+  medicalCertificate('Medical certificate'),
+  dischargeSummary('Discharge summary'),
+  procedureNote('Operation / procedure note'),
+  vaccination('Vaccination record'),
+  referral('Referral letter'),
+  consultation('Consultation note'),
+  clinicalNote('Clinical note'),
+  vitalSigns('Vital signs'),
+  diagnosis('Diagnosis'),
+  medicationHistory('Medication history'),
+  allergy('Allergy record'),
+  chronicDisease('Chronic disease record'),
+  followUp('Follow-up note'),
+  other('Medical document');
+
+  final String label;
+  const MedicalRecordType(this.label);
+
+  static MedicalRecordType fromDatabase(String? value) {
+    final normalized = (value ?? '').toLowerCase().replaceAll(
+      RegExp(r'[^a-z]'),
+      '',
+    );
+    return values.firstWhere(
+      (type) => type.name.toLowerCase() == normalized,
+      orElse: () => other,
+    );
+  }
+}
+
+enum MedicalRecordSource { encounter, prescription, lab, clinical, upload }
+
+class MedicalRecordModel {
+  final String id;
+  final MedicalRecordSource source;
+  final MedicalRecordType type;
+  final String specialtyId;
+  final String title;
+  final DateTime date;
+  final String facility;
+  final String doctor;
+  final String summary;
+  final List<String> fileUrls;
+  final List<String> fileNames;
+  final List<String> mimeTypes;
+  final Map<String, dynamic> details;
+
+  const MedicalRecordModel({
+    required this.id,
+    required this.source,
+    required this.type,
+    required this.specialtyId,
+    required this.title,
+    required this.date,
+    this.facility = '',
+    this.doctor = '',
+    this.summary = '',
+    this.fileUrls = const [],
+    this.fileNames = const [],
+    this.mimeTypes = const [],
+    this.details = const {},
+  });
+
+  bool get hasOriginalDocument => fileUrls.isNotEmpty;
+
+  String get year => date.year.toString();
 }

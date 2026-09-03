@@ -1,8 +1,8 @@
 {
-  "name": "cnic-health-card-staff",
+  "name": "hayaat-id-staff",
   "private": true,
   "version": "1.0.0",
-  "description": "Clinic staff portal (doctor, lab worker, receptionist) for the CNIC Health Card System.",
+  "description": "Clinic staff portal (doctor, lab worker, receptionist) for the Hayaat ID health platform.",
   "type": "module",
   "scripts": {
     "dev": "vite",

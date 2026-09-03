@@ -110,7 +110,7 @@ export default function MessagesPage() {
             <header className="chat-thread-head between">
               <div>
                 <strong>{active.patient?.full_name ?? 'Patient'}</strong>
-                {active.patient?.cnic && <div className="muted" style={{ fontSize: 12 }}>{active.patient.cnic}</div>}
+                {active.patient?.card_number && <div className="muted mono" style={{ fontSize: 12 }}>{active.patient.card_number.replace(/(\d{4})(?=\d)/g, '$1 ')}</div>}
               </div>
             </header>
 

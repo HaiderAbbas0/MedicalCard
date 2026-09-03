@@ -15,10 +15,10 @@ let pass = 0, fail = 0;
 const ok = (n) => { pass++; console.log(`  ✓ ${n}`); };
 const bad = (n, d) => { fail++; console.log(`  ✗ ${n}${d ? ` — ${d}` : ''}`); };
 
-async function signIn(cnic) {
+async function signIn(login) {
   const c = createClient(URL, KEY, opts);
-  const { data, error } = await c.auth.signInWithPassword({ email: email(cnic), password: PW });
-  if (error) throw new Error(`${cnic}: ${error.message}`);
+  const { data, error } = await c.auth.signInWithPassword({ email: email(login), password: PW });
+  if (error) throw new Error(`${login}: ${error.message}`);
   return { client: c, uid: data.user.id };
 }
 

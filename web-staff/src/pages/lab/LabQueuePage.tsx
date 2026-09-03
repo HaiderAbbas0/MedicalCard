@@ -77,20 +77,19 @@ function UploadModal({ order, onClose, onDone }: { order: LabQueueOrder; onClose
   const [comments, setComments] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [progress, setProgress] = useState('');
 
   async function submit() {
     setBusy(true);
     setError('');
+    setProgress('Preparing upload...');
     try {
       const file = fileRef.current?.files?.[0];
-      if (file) {
-        await labApi.uploadResultFile(order.id, file, comments || undefined);
-      } else {
-        await labApi.uploadResult(order.id, {
-          result_file_name: `${order.test_name.replace(/\s+/g, '_').toLowerCase()}.pdf`,
-          comments: comments || undefined,
-        });
+      if (!file) {
+        setError('Select the actual result PDF or image before submitting.');
+        return;
       }
+      await labApi.uploadResultFile(order.id, file, comments || undefined, setProgress);
       onDone();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed.');
@@ -118,7 +117,9 @@ function UploadModal({ order, onClose, onDone }: { order: LabQueueOrder; onClose
         <label>Comments (optional)</label>
         <textarea className="input" rows={3} value={comments} onChange={(e) => setComments(e.target.value)} />
       </div>
+      {progress && <div className="muted" style={{ fontSize: 12 }}>{progress}</div>}
       {error && <div className="error-text">{error}</div>}
+      {error && <p className="muted" style={{ fontSize: 12 }}>Fix the issue and submit again to retry.</p>}
       <p className="muted" style={{ fontSize: 12 }}>Submitting notifies the ordering doctor automatically.</p>
     </Modal>
   );

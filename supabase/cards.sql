@@ -1,33 +1,42 @@
 -- ============================================================================
 --  HayaatID — Card issuance (run AFTER schema.sql, once, in the SQL Editor)
 --
---  Adds: per-role card numbers (HAY-PAT-0001 …), a cards table, request RPCs,
---  RLS, and a public storage bucket for card photos. Safe to re-run.
+--  Adds: 16-digit numeric Hayaat IDs, a cards table, request RPCs,
+--  RLS, and a private storage bucket for card photos. Safe to re-run.
 -- ============================================================================
 
 -- Card number on the profile (also a DB lookup key).
 alter table public.profiles add column if not exists card_number text unique;
 
--- Per-role sequences.
-create sequence if not exists public.hay_pat_seq start 1;
-create sequence if not exists public.hay_doc_seq start 1;
-create sequence if not exists public.hay_lab_seq start 1;
-create sequence if not exists public.hay_rec_seq start 1;
-create sequence if not exists public.hay_adm_seq start 1;
+create or replace function public.hayaat_luhn_check_digit(p_first_15 text)
+returns text language plpgsql immutable strict as $$
+declare total integer := 0; digit integer; i integer;
+begin
+  if p_first_15 !~ '^[0-9]{15}$' then
+    raise exception 'Hayaat ID base must contain exactly 15 digits';
+  end if;
+  for i in 1..15 loop
+    digit := substr(p_first_15, i, 1)::integer;
+    if mod(i, 2) = 1 then
+      digit := digit * 2;
+      if digit > 9 then digit := digit - 9; end if;
+    end if;
+    total := total + digit;
+  end loop;
+  return ((10 - mod(total, 10)) % 10)::text;
+end;
+$$;
 
 create or replace function public.gen_card_number(p_role text)
-  returns text language plpgsql security definer set search_path = public as
-$$
-declare n bigint; prefix text;
+returns text language plpgsql security definer set search_path = public as $$
+declare base text; candidate text;
 begin
-  case p_role
-    when 'doctor'       then n := nextval('public.hay_doc_seq'); prefix := 'DOC';
-    when 'lab_worker'   then n := nextval('public.hay_lab_seq'); prefix := 'LAB';
-    when 'receptionist' then n := nextval('public.hay_rec_seq'); prefix := 'REC';
-    when 'admin'        then n := nextval('public.hay_adm_seq'); prefix := 'ADM';
-    else                     n := nextval('public.hay_pat_seq'); prefix := 'PAT';
-  end case;
-  return 'HAY-' || prefix || '-' || lpad(n::text, 4, '0');
+  loop
+    base := lpad(floor(random() * 1000000000000000)::bigint::text, 15, '0');
+    candidate := base || public.hayaat_luhn_check_digit(base);
+    exit when not exists (select 1 from public.profiles where card_number = candidate);
+  end loop;
+  return candidate;
 end;
 $$;
 
@@ -58,36 +67,76 @@ create policy p_cards_sel on public.cards for select to authenticated using (pro
 create policy p_cards_upd on public.cards for update to authenticated using (profile_id = auth.uid());
 
 -- Issue or update the caller's card (atomic; assigns the next number on first issue).
-create or replace function public.request_card(
-  p_name_ur text, p_dob date, p_blood_group text, p_city text, p_photo_url text)
+drop function if exists public.request_card(text, date, text, text, text);
+drop function if exists public.request_card(text, text, date, text, text, text);
+
+create function public.request_card(
+  p_name_en text default null,
+  p_name_ur text default null,
+  p_dob date default null,
+  p_blood_group text default null,
+  p_city text default null,
+  p_photo_url text default null)
   returns public.cards language plpgsql security definer set search_path = public as
-$$
-declare v_role text; v_name text; v_num text; v_card public.cards;
+$fn$
+declare
+  v_role text;
+  v_name text;
+  v_num text;
+  v_card public.cards;
 begin
-  select role, full_name into v_role, v_name from public.profiles where id = auth.uid();
+  select role, full_name, card_number into v_role, v_name, v_num
+    from public.profiles where id = auth.uid();
   if v_role is null then raise exception 'Profile not found.'; end if;
+
+  -- Reuse the number issued at sign-up. Only mint one if the account somehow
+  -- has none (rows created before card numbers existed).
+  if v_num is null or v_num !~ '^[0-9]{16}$' then
+    v_num := public.gen_hayaat_id();
+  end if;
 
   select * into v_card from public.cards where profile_id = auth.uid();
   if v_card.id is null then
-    v_num := public.gen_card_number(v_role);
-    insert into public.cards (profile_id, card_number, role, name_en, name_ur, date_of_birth, blood_group, city, photo_url, status)
-      values (auth.uid(), v_num, v_role, v_name, p_name_ur, p_dob, p_blood_group, p_city, p_photo_url, 'virtual')
-      returning * into v_card;
-    update public.profiles set card_number = v_num, date_of_birth = coalesce(date_of_birth, p_dob) where id = auth.uid();
+    insert into public.cards
+      (profile_id, card_number, role, name_en, name_ur, date_of_birth,
+       blood_group, city, photo_url, status)
+    values
+      (auth.uid(), v_num, v_role, coalesce(nullif(p_name_en, ''), v_name),
+       p_name_ur, p_dob, p_blood_group, p_city, p_photo_url, 'virtual')
+    returning * into v_card;
   else
     update public.cards set
-      name_ur = p_name_ur, date_of_birth = p_dob, blood_group = p_blood_group, city = p_city,
-      photo_url = coalesce(p_photo_url, photo_url), updated_at = now()
-    where profile_id = auth.uid() returning * into v_card;
+      card_number   = v_num,
+      name_en       = coalesce(nullif(p_name_en, ''), name_en),
+      name_ur       = p_name_ur,
+      date_of_birth = p_dob,
+      blood_group   = p_blood_group,
+      city          = p_city,
+      photo_url     = coalesce(p_photo_url, photo_url),
+      updated_at    = now()
+    where profile_id = auth.uid()
+    returning * into v_card;
   end if;
 
-  -- Keep the patient profile in sync.
-  update public.patient_profiles set blood_group = p_blood_group, address_city = p_city where id = auth.uid();
+  -- Keep all three copies of the number, and the demographics, in step.
+  update public.profiles
+     set card_number   = v_num,
+         date_of_birth = coalesce(date_of_birth, p_dob)
+   where id = auth.uid();
+
+  update public.patient_profiles
+     set blood_group        = coalesce(p_blood_group, blood_group),
+         address_city       = coalesce(p_city, address_city),
+         health_card_number = v_num
+   where id = auth.uid();
+
   return v_card;
 end;
-$$;
+$fn$;
 
--- Request a physical card (delivery details + status).
+revoke all on function public.request_card(text, text, date, text, text, text) from public;
+grant execute on function public.request_card(text, text, date, text, text, text) to authenticated;
+
 create or replace function public.request_physical_card(p_address text, p_phone text)
   returns public.cards language plpgsql security definer set search_path = public as
 $$
@@ -101,10 +150,16 @@ begin
 end;
 $$;
 
--- Public bucket for card photos.
-insert into storage.buckets (id, name, public) values ('card-photos', 'card-photos', true)
-on conflict (id) do nothing;
+-- Private bucket for card photos. Clients store the object path on the card
+-- row and use signed URLs when displaying it.
+insert into storage.buckets (id, name, public) values ('card-photos', 'card-photos', false)
+on conflict (id) do update set public = false;
 drop policy if exists p_cardphoto_read on storage.objects;
 drop policy if exists p_cardphoto_write on storage.objects;
-create policy p_cardphoto_read on storage.objects for select to authenticated using (bucket_id = 'card-photos');
-create policy p_cardphoto_write on storage.objects for insert to authenticated with check (bucket_id = 'card-photos');
+create policy p_cardphoto_read on storage.objects for select to authenticated
+  using (
+    bucket_id = 'card-photos'
+    and ((storage.foldername(name))[1] = auth.uid()::text or is_staff())
+  );
+create policy p_cardphoto_write on storage.objects for insert to authenticated
+  with check (bucket_id = 'card-photos' and (storage.foldername(name))[1] = auth.uid()::text);

@@ -7,18 +7,9 @@
 -- conversation is PHI-adjacent, so we do NOT expose it to all staff/admins).
 -- Realtime is enabled on `messages` so both clients receive replies live.
 --
--- NOTE: this script DROPS any existing public.messages / public.conversations
--- first, so it recreates them with the correct shape even if a prior/partial run
--- (or a Supabase template) left a table of the same name behind. This is safe
--- because messaging carries no production data yet. Re-running it resets chat.
 -- ============================================================================
 
--- Remove any pre-existing (possibly wrong-shaped) tables so the definitions below
--- always apply. `cascade` also drops the FK/trigger/policies that depend on them.
-drop table if exists public.messages cascade;
-drop table if exists public.conversations cascade;
-
-create table public.conversations (
+create table if not exists public.conversations (
   id              uuid primary key default gen_random_uuid(),
   patient_id      uuid not null references public.profiles(id) on delete cascade,
   doctor_id       uuid not null references public.profiles(id) on delete cascade,
@@ -28,7 +19,7 @@ create table public.conversations (
   unique (patient_id, doctor_id)
 );
 
-create table public.messages (
+create table if not exists public.messages (
   id              uuid primary key default gen_random_uuid(),
   conversation_id uuid not null references public.conversations(id) on delete cascade,
   sender_id       uuid not null references public.profiles(id) on delete cascade,
@@ -36,6 +27,14 @@ create table public.messages (
   created_at      timestamptz not null default now(),
   read_at         timestamptz
 );
+
+alter table public.conversations
+  add column if not exists last_message text,
+  add column if not exists last_message_at timestamptz,
+  add column if not exists created_at timestamptz not null default now();
+
+alter table public.messages
+  add column if not exists read_at timestamptz;
 
 create index if not exists idx_messages_convo_time on public.messages (conversation_id, created_at);
 create index if not exists idx_conversations_patient on public.conversations (patient_id);

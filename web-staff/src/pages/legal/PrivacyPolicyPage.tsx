@@ -1,17 +1,17 @@
 import LegalLayout from './LegalLayout';
 
 /**
- * Public privacy policy for the HayaatID / SehatID CNIC-linked digital health card
+ * Public privacy policy for the HayaatID digital health card
  * platform (Pakistan). Not lawyer-vetted — see the disclaimer in LegalLayout.
  */
 export default function PrivacyPolicyPage() {
   return (
     <LegalLayout title="Privacy Policy">
       <p>
-        This Privacy Policy explains how the HayaatID / SehatID digital health-card platform
+        This Privacy Policy explains how the HayaatID digital health-card platform
         (&ldquo;the Platform&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;) collects, uses, stores, and protects your
-        personal and health information. The Platform links a Pakistani Computerised National
-        Identity Card (CNIC) to a digital health card so that patients and their treating
+        personal and health information. The Platform links a unique Hayaat ID
+        to a digital health card so that patients and their treating
         clinicians can access accurate medical records at the point of care.
       </p>
 
@@ -26,9 +26,9 @@ export default function PrivacyPolicyPage() {
       <h2>2. What data we collect</h2>
       <p>We collect only the data needed to identify you and to provide safe clinical care:</p>
       <ul>
-        <li><strong>Identity data</strong> — CNIC number, full name, date of birth, and gender.</li>
+        <li><strong>Identity data</strong> — Hayaat ID, full name, date of birth, and gender.</li>
         <li><strong>Contact data</strong> — primary phone number and, where provided, email address.</li>
-        <li><strong>Card data</strong> — your card photo and the CNIC-derived health-card identifier.</li>
+        <li><strong>Card data</strong> — your card photo and unique 16-digit Hayaat ID.</li>
         <li>
           <strong>Clinical data</strong> — blood group, allergies, conditions, encounters and
           consultation notes, prescriptions, appointments, and other records created by treating

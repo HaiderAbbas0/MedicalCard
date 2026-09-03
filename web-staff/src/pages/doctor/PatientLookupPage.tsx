@@ -4,20 +4,17 @@ import { doctorApi } from '../../api/doctor';
 
 export default function PatientLookupPage() {
   const navigate = useNavigate();
-  const [cardNumber, setCardNumber] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function search(e: FormEvent) {
     e.preventDefault();
     setError('');
-    const query = cardNumber.trim().toUpperCase();
-    if (!query.startsWith('HAY-PAT-')) {
-      setError('Card number must start with HAY-PAT-.');
-      return;
-    }
-    if (query.length < 9) {
-      setError('Enter a valid Card Number (e.g. HAY-PAT-0004).');
+    // 13 digits = CNIC (P-FR-019, the usual case); 16 = Hayaat card number.
+    const query = identifier.replace(/\D/g, '');
+    if (!/^\d{13}$/.test(query) && !/^\d{16}$/.test(query)) {
+      setError('Enter a 13-digit CNIC or a 16-digit Hayaat ID.');
       return;
     }
     setBusy(true);
@@ -33,13 +30,15 @@ export default function PatientLookupPage() {
 
   return (
     <div className="card card-pad" style={{ maxWidth: 520 }}>
-      <p className="section-title">Find a patient by Card Number</p>
+      <p className="section-title">Find a patient by CNIC</p>
       <p className="muted" style={{ marginTop: 0 }}>
-        Looking up a patient records an access entry in the audit log (Scope §12.2).
+        Enter the patient&apos;s 13-digit CNIC. The 16-digit number on their Hayaat
+        card also works. Every lookup is recorded in the access audit log.
       </p>
       <form onSubmit={search} className="row" style={{ marginTop: 16 }}>
-        <input className="input" placeholder="Card Number (e.g. HAY-PAT-0004)" value={cardNumber}
-          onChange={(e) => setCardNumber(e.target.value)} autoFocus />
+        <input className="input" inputMode="numeric" maxLength={16}
+          placeholder="13-digit CNIC (or 16-digit Hayaat ID)" value={identifier}
+          onChange={(e) => setIdentifier(e.target.value.replace(/\D/g, '').slice(0, 16))} autoFocus />
         <button className="btn btn-primary" disabled={busy}>{busy ? 'Searching…' : 'Search'}</button>
       </form>
       {error && <div className="error-text">{error}</div>}

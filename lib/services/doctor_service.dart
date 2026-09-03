@@ -9,7 +9,11 @@ class DoctorService {
   String _today() => DateTime.now().toIso8601String().substring(0, 10);
 
   Future<String?> _encPatient(String encId) async {
-    final r = await db.from('encounters').select('patient_id').eq('id', encId).maybeSingle();
+    final r = await db
+        .from('encounters')
+        .select('patient_id')
+        .eq('id', encId)
+        .maybeSingle();
     return r?['patient_id']?.toString();
   }
 
@@ -17,7 +21,7 @@ class DoctorService {
   Future<List<AppointmentModel>> appointments({String? date}) async {
     var q = db
         .from('appointments')
-        .select('*, patient:profiles!patient_id(id, full_name, cnic)')
+        .select('*, patient:profiles!patient_id(id, full_name, card_number)')
         .eq('doctor_id', _me);
     if (date != null) q = q.eq('appointment_date', date);
     final rows = await q as List;
@@ -29,7 +33,12 @@ class DoctorService {
   }
 
   Future<void> confirmAppointment(String id) async {
-    final a = await db.from('appointments').update({'status': 'confirmed'}).eq('id', id).select().maybeSingle();
+    final a = await db
+        .from('appointments')
+        .update({'status': 'confirmed'})
+        .eq('id', id)
+        .select()
+        .maybeSingle();
     if (a != null) {
       await db.from('notifications').insert({
         'recipient_id': a['patient_id'],
@@ -46,36 +55,74 @@ class DoctorService {
       db.from('appointments').update({'status': 'no_show'}).eq('id', id);
 
   // ── Patients ────────────────────────────────────────────────────────────────
-  Future<PatientSummary> searchPatient(String cnic) async {
-    final prof = await db.from('profiles').select().eq('cnic', cnic).eq('role', 'patient').maybeSingle();
-    if (prof == null) throw Exception('No patient found with that CNIC.');
+
+  /// P-FR-019 — find a patient from the identifier printed on their card.
+  ///
+  /// Accepts a 13-digit CNIC (the citizen identity) or a 16-digit Hayaat ID.
+  /// The lookup goes through `find_patient_by_identifier`, a SECURITY DEFINER
+  /// function: clinical RLS scopes `profiles` to patients the doctor already
+  /// has a care relationship with, so a direct select cannot find a walk-in.
+  /// The function is staff-only, returns demographics only, and writes its own
+  /// audit row for every hit.
+  Future<PatientSummary> searchPatient(String identifier) async {
+    final digits = identifier.replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 13 && digits.length != 16) {
+      throw Exception('Enter a 13-digit CNIC or a 16-digit Hayaat ID.');
+    }
+    final rows =
+        await db.rpc(
+              'find_patient_by_identifier',
+              params: {'p_identifier': digits},
+            )
+            as List;
+    if (rows.isEmpty) {
+      throw Exception(
+        digits.length == 13
+            ? 'No patient is registered with that CNIC.'
+            : 'No patient found with that Hayaat ID.',
+      );
+    }
+    final prof = Map<String, dynamic>.from(rows.first as Map);
     final id = prof['id'].toString();
-    final pp = await db.from('patient_profiles').select().eq('id', id).maybeSingle();
-    final allergies = await db.from('allergies').select().eq('patient_id', id) as List;
-    final conds = await db.from('conditions').select().eq('patient_id', id).eq('clinical_status', 'active') as List;
-    await db.from('audit_logs').insert({
-      'actor_id': _me, 'actor_role': 'doctor', 'action': 'read',
-      'resource_type': 'patient_profiles', 'resource_id': id, 'patient_id': id,
-    });
+    final allergies =
+        await db.from('allergies').select().eq('patient_id', id) as List;
+    final conds =
+        await db
+                .from('conditions')
+                .select()
+                .eq('patient_id', id)
+                .eq('clinical_status', 'active')
+            as List;
+    // The lookup RPC already writes the audit row for this access, so the
+    // client no longer inserts a second one.
     return PatientSummary.fromJson({
-      ...Map<String, dynamic>.from(prof),
-      'blood_group': pp?['blood_group'],
+      ...prof,
       'allergies': allergies,
       'active_conditions': conds,
     });
   }
 
   Future<List<Map<String, dynamic>>> patientTimeline(String patientId) async {
-    final rows = await db
-        .from('encounters')
-        .select('*, conditions(*), medication_requests(*), observations(*), lab_orders(*)')
-        .eq('patient_id', patientId)
-        .eq('status', 'finalized')
-        .order('encounter_date', ascending: false) as List;
+    final rows =
+        await db
+                .from('encounters')
+                .select(
+                  '*, conditions(*), medication_requests(*), observations(*), lab_orders(*)',
+                )
+                .eq('patient_id', patientId)
+                .eq('status', 'finalized')
+                .order('encounter_date', ascending: false)
+            as List;
     final docNames = <String, dynamic>{};
-    final ids = rows.map((e) => e['doctor_id']?.toString() ?? '').where((e) => e.isNotEmpty).toSet().toList();
+    final ids = rows
+        .map((e) => e['doctor_id']?.toString() ?? '')
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
     if (ids.isNotEmpty) {
-      final dn = await db.from('profiles').select('id, full_name').inFilter('id', ids) as List;
+      final dn =
+          await db.from('profiles').select('id, full_name').inFilter('id', ids)
+              as List;
       for (final d in dn) docNames[d['id'].toString()] = d['full_name'];
     }
     return rows.map((e) {
@@ -86,20 +133,27 @@ class DoctorService {
     }).toList();
   }
 
-  Future<List<Map<String, dynamic>>> patientMedications(String patientId) async {
-    final rows = await db
-        .from('medication_requests')
-        .select()
-        .eq('patient_id', patientId)
-        .eq('status', 'active') as List;
+  Future<List<Map<String, dynamic>>> patientMedications(
+    String patientId,
+  ) async {
+    final rows =
+        await db
+                .from('medication_requests')
+                .select()
+                .eq('patient_id', patientId)
+                .eq('status', 'active')
+            as List;
     return rows.cast<Map<String, dynamic>>();
   }
 
-  Future<void> recordAllergy(String patientId, String substance,
-      {String criticality = 'high',
-      String? reaction,
-      String severity = 'moderate',
-      String? triggerNote}) async {
+  Future<void> recordAllergy(
+    String patientId,
+    String substance, {
+    String criticality = 'high',
+    String? reaction,
+    String severity = 'moderate',
+    String? triggerNote,
+  }) async {
     await db.from('allergies').insert({
       'patient_id': patientId,
       'recorded_by_id': _me,
@@ -113,45 +167,71 @@ class DoctorService {
   }
 
   // ── Encounters ──────────────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> createEncounter(String patientId,
-      {String? chiefComplaint, String? specialty}) async {
-    final row = await db.from('encounters').insert({
-      'patient_id': patientId,
-      'doctor_id': _me,
-      'encounter_date': _today(),
-      if (chiefComplaint != null) 'chief_complaint': chiefComplaint,
-      if (specialty != null) 'specialty': specialty,
-      'status': 'draft',
-    }).select().single();
+  Future<Map<String, dynamic>> createEncounter(
+    String patientId, {
+    String? chiefComplaint,
+    String? specialty,
+  }) async {
+    final row = await db
+        .from('encounters')
+        .insert({
+          'patient_id': patientId,
+          'doctor_id': _me,
+          'encounter_date': _today(),
+          if (chiefComplaint != null) 'chief_complaint': chiefComplaint,
+          if (specialty != null) 'specialty': specialty,
+          'status': 'draft',
+        })
+        .select()
+        .single();
     return Map<String, dynamic>.from(row);
   }
 
-  Future<void> updateEncounter(String encounterId, Map<String, dynamic> patch) =>
-      db.from('encounters').update(patch).eq('id', encounterId);
+  Future<void> updateEncounter(
+    String encounterId,
+    Map<String, dynamic> patch,
+  ) => db.from('encounters').update(patch).eq('id', encounterId);
 
-  Future<Map<String, dynamic>> addCondition(String encounterId, String display, {String? icd10}) async {
+  Future<Map<String, dynamic>> addCondition(
+    String encounterId,
+    String display, {
+    String? icd10,
+  }) async {
     final pid = await _encPatient(encounterId);
-    final row = await db.from('conditions').insert({
-      'encounter_id': encounterId,
-      'patient_id': pid,
-      'doctor_id': _me,
-      'condition_display': display,
-      if (icd10 != null) 'icd10_code': icd10,
-    }).select().single();
+    final row = await db
+        .from('conditions')
+        .insert({
+          'encounter_id': encounterId,
+          'patient_id': pid,
+          'doctor_id': _me,
+          'condition_display': display,
+          if (icd10 != null) 'icd10_code': icd10,
+        })
+        .select()
+        .single();
     return Map<String, dynamic>.from(row);
   }
 
-  Future<Map<String, dynamic>> addMedication(String encounterId, String name,
-      {num? dosageValue,
-      String? dosageUnit,
-      String? frequency,
-      int? durationDays,
-      bool morning = false,
-      bool afternoon = false,
-      bool evening = false,
-      bool night = false}) async {
+  Future<Map<String, dynamic>> addMedication(
+    String encounterId,
+    String name, {
+    num? dosageValue,
+    String? dosageUnit,
+    String? frequency,
+    int? durationDays,
+    bool morning = false,
+    bool afternoon = false,
+    bool evening = false,
+    bool night = false,
+  }) async {
     final pid = await _encPatient(encounterId);
-    final allergies = await db.from('allergies').select().eq('patient_id', pid ?? '').eq('clinical_status', 'active') as List;
+    final allergies =
+        await db
+                .from('allergies')
+                .select()
+                .eq('patient_id', pid ?? '')
+                .eq('clinical_status', 'active')
+            as List;
     final lower = name.toLowerCase();
     Map? conflict;
     for (final a in allergies) {
@@ -161,23 +241,27 @@ class DoctorService {
         break;
       }
     }
-    final med = await db.from('medication_requests').insert({
-      'encounter_id': encounterId,
-      'patient_id': pid,
-      'doctor_id': _me,
-      'medication_name': name,
-      if (dosageValue != null) 'dosage_value': dosageValue,
-      if (dosageUnit != null) 'dosage_unit': dosageUnit,
-      'route': 'oral',
-      if (frequency != null) 'frequency': frequency,
-      if (durationDays != null) 'duration_days': durationDays,
-      'dose_morning': morning,
-      'dose_afternoon': afternoon,
-      'dose_evening': evening,
-      'dose_night': night,
-      'status': 'active',
-      'start_date': _today(),
-    }).select().single();
+    final med = await db
+        .from('medication_requests')
+        .insert({
+          'encounter_id': encounterId,
+          'patient_id': pid,
+          'doctor_id': _me,
+          'medication_name': name,
+          if (dosageValue != null) 'dosage_value': dosageValue,
+          if (dosageUnit != null) 'dosage_unit': dosageUnit,
+          'route': 'oral',
+          if (frequency != null) 'frequency': frequency,
+          if (durationDays != null) 'duration_days': durationDays,
+          'dose_morning': morning,
+          'dose_afternoon': afternoon,
+          'dose_evening': evening,
+          'dose_night': night,
+          'status': 'active',
+          'start_date': _today(),
+        })
+        .select()
+        .single();
     return {
       'medication': med,
       'allergy_warning': conflict == null
@@ -186,45 +270,72 @@ class DoctorService {
     };
   }
 
-  Future<Map<String, dynamic>> addVital(String encounterId, String display, {num? value, String? unit}) async {
+  Future<Map<String, dynamic>> addVital(
+    String encounterId,
+    String display, {
+    num? value,
+    String? unit,
+  }) async {
     final pid = await _encPatient(encounterId);
-    final row = await db.from('observations').insert({
-      'encounter_id': encounterId,
-      'patient_id': pid,
-      'authored_by_id': _me,
-      'observation_display': display,
-      if (value != null) 'value_quantity': value,
-      if (unit != null) 'value_unit': unit,
-      'observation_date': _today(),
-    }).select().single();
+    final row = await db
+        .from('observations')
+        .insert({
+          'encounter_id': encounterId,
+          'patient_id': pid,
+          'authored_by_id': _me,
+          'observation_display': display,
+          if (value != null) 'value_quantity': value,
+          if (unit != null) 'value_unit': unit,
+          'observation_date': _today(),
+        })
+        .select()
+        .single();
     return Map<String, dynamic>.from(row);
   }
 
   Future<List<Map<String, dynamic>>> labs() async {
-    final rows = await db.from('diagnostic_labs').select('id, name, address_city').eq('status', 'active') as List;
+    final rows =
+        await db
+                .from('diagnostic_labs')
+                .select('id, name, address_city')
+                .eq('status', 'active')
+            as List;
     return rows.cast<Map<String, dynamic>>();
   }
 
-  Future<Map<String, dynamic>> addLabOrder(String encounterId, String testName, String labId,
-      {String priority = 'routine', String? clinicalIndication}) async {
+  Future<Map<String, dynamic>> addLabOrder(
+    String encounterId,
+    String testName,
+    String labId, {
+    String priority = 'routine',
+    String? clinicalIndication,
+  }) async {
     final pid = await _encPatient(encounterId);
-    final row = await db.from('lab_orders').insert({
-      'encounter_id': encounterId,
-      'patient_id': pid,
-      'ordering_doctor_id': _me,
-      'lab_id': labId,
-      'test_name': testName,
-      'priority': priority,
-      if (clinicalIndication != null) 'clinical_indication': clinicalIndication,
-      'status': 'ordered',
-    }).select().single();
+    final row = await db
+        .from('lab_orders')
+        .insert({
+          'encounter_id': encounterId,
+          'patient_id': pid,
+          'ordering_doctor_id': _me,
+          'lab_id': labId,
+          'test_name': testName,
+          'priority': priority,
+          if (clinicalIndication != null)
+            'clinical_indication': clinicalIndication,
+          'status': 'ordered',
+        })
+        .select()
+        .single();
     return Map<String, dynamic>.from(row);
   }
 
   Future<Map<String, dynamic>> finalizeEncounter(String encounterId) async {
     final row = await db
         .from('encounters')
-        .update({'status': 'finalized', 'finalized_at': DateTime.now().toIso8601String()})
+        .update({
+          'status': 'finalized',
+          'finalized_at': DateTime.now().toIso8601String(),
+        })
         .eq('id', encounterId)
         .select()
         .single();
@@ -240,26 +351,44 @@ class DoctorService {
 
   // ── Lab review & release ─────────────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> labOrdersForReview() async {
-    final rows = await db
-        .from('lab_orders')
-        .select('*, patient:profiles!patient_id(full_name), lab_results(*)')
-        .eq('ordering_doctor_id', _me)
-        .inFilter('status', ['resulted', 'reviewed']) as List;
+    final rows =
+        await db
+                .from('lab_orders')
+                .select(
+                  '*, patient:profiles!patient_id(full_name), lab_results(*)',
+                )
+                .eq('ordering_doctor_id', _me)
+                .inFilter('status', ['resulted', 'reviewed'])
+            as List;
     return rows.map((r) {
       final m = Map<String, dynamic>.from(r);
-      final results = r['lab_results'] as List?;
-      m['result'] = (results != null && results.isNotEmpty) ? results.first : null;
+      // lab_results.lab_order_id is UNIQUE, so PostgREST returns the result as
+      // a single object, not a list. Accept either shape.
+      final raw = r['lab_results'];
+      m['result'] = raw is Map
+          ? raw
+          : (raw is List && raw.isNotEmpty)
+          ? raw.first
+          : null;
       return m;
     }).toList();
   }
 
-  Future<void> reviewLabOrder(String id) =>
-      db.from('lab_orders').update({'status': 'reviewed', 'reviewed_at': DateTime.now().toIso8601String()}).eq('id', id);
+  Future<void> reviewLabOrder(String id) => db
+      .from('lab_orders')
+      .update({
+        'status': 'reviewed',
+        'reviewed_at': DateTime.now().toIso8601String(),
+      })
+      .eq('id', id);
 
   Future<void> releaseLabOrder(String id) async {
     final o = await db
         .from('lab_orders')
-        .update({'status': 'released_to_patient', 'released_to_patient_at': DateTime.now().toIso8601String()})
+        .update({
+          'status': 'released_to_patient',
+          'released_to_patient_at': DateTime.now().toIso8601String(),
+        })
         .eq('id', id)
         .select()
         .maybeSingle();
@@ -276,7 +405,9 @@ class DoctorService {
 
   // ── Availability ─────────────────────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> availability() async {
-    final rows = await db.from('doctor_availability').select().eq('doctor_id', _me) as List;
+    final rows =
+        await db.from('doctor_availability').select().eq('doctor_id', _me)
+            as List;
     return rows.cast<Map<String, dynamic>>();
   }
 
@@ -285,25 +416,50 @@ class DoctorService {
     required String startTime,
     required String endTime,
     int slotDurationMinutes = 30,
-  }) =>
-      db.from('doctor_availability').insert({
-        'doctor_id': _me,
-        'day_of_week': dayOfWeek,
-        'start_time': startTime,
-        'end_time': endTime,
-        'slot_duration_minutes': slotDurationMinutes,
-        'is_active': true,
-      });
+  }) async {
+    if (slotDurationMinutes <= 0) {
+      throw Exception('Slot length must be greater than 0 minutes.');
+    }
+    if (startTime.compareTo(endTime) >= 0) {
+      throw Exception('End time must be later than start time.');
+    }
+    final existing = await db
+        .from('doctor_availability')
+        .select('id')
+        .eq('doctor_id', _me)
+        .eq('day_of_week', dayOfWeek)
+        .eq('start_time', startTime)
+        .eq('end_time', endTime)
+        .eq('slot_duration_minutes', slotDurationMinutes)
+        .maybeSingle();
+    if (existing != null) throw Exception('This weekly slot already exists.');
+    await db.from('doctor_availability').insert({
+      'doctor_id': _me,
+      'day_of_week': dayOfWeek,
+      'start_time': startTime,
+      'end_time': endTime,
+      'slot_duration_minutes': slotDurationMinutes,
+      'is_active': true,
+    });
+  }
 
-  Future<void> deleteAvailability(String id) => db.from('doctor_availability').delete().eq('id', id);
+  Future<void> deleteAvailability(String id) =>
+      db.from('doctor_availability').delete().eq('id', id);
 
   // ── Profile ──────────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> patch) async {
     const baseFields = {'full_name', 'phone_primary', 'email'};
-    final base = {for (final e in patch.entries) if (baseFields.contains(e.key)) e.key: e.value};
-    final ext = {for (final e in patch.entries) if (!baseFields.contains(e.key)) e.key: e.value};
+    final base = {
+      for (final e in patch.entries)
+        if (baseFields.contains(e.key)) e.key: e.value,
+    };
+    final ext = {
+      for (final e in patch.entries)
+        if (!baseFields.contains(e.key)) e.key: e.value,
+    };
     if (base.isNotEmpty) await db.from('profiles').update(base).eq('id', _me);
-    if (ext.isNotEmpty) await db.from('doctor_profiles').update(ext).eq('id', _me);
+    if (ext.isNotEmpty)
+      await db.from('doctor_profiles').update(ext).eq('id', _me);
     return (await fetchFullProfile(_me))!;
   }
 }

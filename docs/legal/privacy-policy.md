@@ -1,21 +1,21 @@
-# Privacy Policy — SehatID / HayaatID Digital Health Card
+# Privacy Policy — HayaatID Digital Health Card
 
 **Version:** 2026-07-04 · **Last updated:** 4 July 2026
 
 > ⚠️ **Template — pending review by qualified legal counsel.** This document is a
-> good-faith draft for a Pakistan CNIC-linked digital health platform. It must be
+> good-faith draft for a digital health platform. It must be
 > reviewed and finalised by a lawyer before production use and must not be relied
 > upon as final legal advice.
 
 ## 1. Who we are
-SehatID/HayaatID ("the platform", "we") operates a centralised digital health-card
-service that links a person's medical history to their CNIC and makes it available,
+HayaatID ("the platform", "we") operates a centralised digital health-card
+service that links a person's medical history to their unique Hayaat ID and makes it available,
 **with consent**, to approved clinics, hospitals, and diagnostic labs.
 
 ## 2. Data we collect
-- **Identity**: CNIC, full name, phone number, email (optional), date of birth,
+- **Identity**: Hayaat ID, full name, phone number, email (optional), date of birth,
   gender, city.
-- **Health card**: card number, card photo, blood group.
+- **Health card**: Hayaat ID, card photo, blood group.
 - **Clinical records**: encounters/visits, diagnoses, prescriptions, vital-sign
   observations, allergies, lab orders and lab results.
 - **Interactions**: appointments, in-app messages with your clinicians,
