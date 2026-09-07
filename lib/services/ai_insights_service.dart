@@ -58,9 +58,15 @@ Rules:
           .get(Uri.parse('$_baseUrl/models'))
           .timeout(const Duration(seconds: 15));
     } catch (_) {
+      // On web a CORS rejection surfaces as a plain network failure, identical
+      // to the server being down — so name both causes rather than guessing.
       throw Exception(
-        'Could not reach LM Studio at $_baseUrl. Make sure LM Studio is running '
-        'with its local server started.',
+        'Could not reach LM Studio at $_baseUrl.\n\n'
+        'Check both of these:\n'
+        '1. LM Studio is running with its local server started, and a model is loaded.\n'
+        '2. "Enable CORS" is switched on in the LM Studio server settings — without '
+        'it the browser blocks the request before it is ever sent, which looks '
+        'exactly like the server being offline.',
       );
     }
     if (res.statusCode != 200) {
