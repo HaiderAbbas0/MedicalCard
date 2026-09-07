@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../api/admin';
 import type { CardDelivery, CardStatus } from '../api/types';
-import { Spinner, Empty, StatusBadge } from '../components/ui';
+import { TableSkeleton } from '../components/Skeleton';
+import { Empty, StatusBadge } from '../components/ui';
 
 export default function CardDeliveriesPage() {
   const [cards, setCards] = useState<CardDelivery[] | null>(null);
@@ -50,7 +51,7 @@ export default function CardDeliveriesPage() {
 
       <div className="card">
         {!cards ? (
-          <Spinner />
+          <TableSkeleton rows={5} cols={6} />
         ) : cards.length === 0 ? (
           <Empty>No physical card requests awaiting delivery.</Empty>
         ) : (

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { researchApi } from '../api/research';
 import type { CohortBucket, CohortFilters, CohortSize, PrevalenceRow } from '../api/types';
-import { Bar, Notice, Spinner } from '../components/ui';
+import { BarsSkeleton, Skeleton } from '../components/Skeleton';
+import { Bar, Notice } from '../components/ui';
 
 const PROVINCES = [
   'Punjab',
@@ -122,7 +123,7 @@ export default function CohortExplorerPage() {
       <div className="card card-pad">
         <div className="section-title">Matching subjects</div>
         {size === null ? (
-          <Spinner />
+          <Skeleton width={210} height={44} radius={9} />
         ) : size.suppressed ? (
           <Notice tone="amber" icon="alert">
             Fewer than 5 consented patients match these filters, so the exact count is withheld.
@@ -139,7 +140,7 @@ export default function CohortExplorerPage() {
       <div className="grid-2">
         <div className="card card-pad">
           <div className="section-title">By age band</div>
-          {byAge === null ? <Spinner /> : byAge.length === 0 ? (
+          {byAge === null ? <BarsSkeleton rows={5} /> : byAge.length === 0 ? (
             <p className="muted">No data for this cohort.</p>
           ) : (
             byAge.map((b) => (
@@ -150,7 +151,7 @@ export default function CohortExplorerPage() {
 
         <div className="card card-pad">
           <div className="section-title">By province</div>
-          {byProvince === null ? <Spinner /> : byProvince.length === 0 ? (
+          {byProvince === null ? <BarsSkeleton rows={5} /> : byProvince.length === 0 ? (
             <p className="muted">No data for this cohort.</p>
           ) : (
             byProvince.map((b) => (
@@ -161,7 +162,7 @@ export default function CohortExplorerPage() {
 
         <div className="card card-pad">
           <div className="section-title">By gender</div>
-          {byGender === null ? <Spinner /> : byGender.length === 0 ? (
+          {byGender === null ? <BarsSkeleton rows={5} /> : byGender.length === 0 ? (
             <p className="muted">No data for this cohort.</p>
           ) : (
             byGender.map((b) => (
@@ -176,7 +177,7 @@ export default function CohortExplorerPage() {
             Grouped to chapter level across the whole consented population, so a rare diagnosis
             cannot single anyone out.
           </p>
-          {prevalence === null ? <Spinner /> : prevalence.length === 0 ? (
+          {prevalence === null ? <BarsSkeleton rows={6} /> : prevalence.length === 0 ? (
             <p className="muted">No diagnoses recorded yet.</p>
           ) : (
             prevalence.map((p) => (

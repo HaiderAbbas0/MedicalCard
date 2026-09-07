@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../api/admin';
 import type { DoctorApplication } from '../api/types';
-import { Spinner, Empty, Modal, StatusBadge } from '../components/ui';
+import { TableSkeleton } from '../components/Skeleton';
+import { Empty, Modal, StatusBadge } from '../components/ui';
 
 export default function DoctorApplicationsPage() {
   const [apps, setApps] = useState<DoctorApplication[] | null>(null);
@@ -50,7 +51,7 @@ export default function DoctorApplicationsPage() {
   }
 
   if (error) return <div className="error-text">{error}</div>;
-  if (!apps) return <Spinner />;
+  if (!apps) return <TableSkeleton rows={5} cols={6} />;
 
   return (
     <div className="card">

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../api/admin';
 import type { Profile, Role } from '../api/types';
-import { Spinner, Empty, Modal, StatusBadge } from '../components/ui';
+import { TableSkeleton } from '../components/Skeleton';
+import { Empty, Modal, StatusBadge } from '../components/ui';
 import CreateAccountModal from '../components/CreateAccountModal';
 import { useAuth } from '../auth/AuthContext';
 
@@ -79,7 +80,7 @@ export default function UsersPage() {
 
       <div className="card">
         {!users ? (
-          <Spinner />
+          <TableSkeleton rows={5} cols={7} />
         ) : users.length === 0 ? (
           <Empty>No users match your filters.</Empty>
         ) : (

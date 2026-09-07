@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { researchApi } from '../api/research';
 import type { DataRequest } from '../api/types';
-import { Empty, Notice, Spinner, StatusBadge } from '../components/ui';
+import { TableSkeleton } from '../components/Skeleton';
+import { Empty, Notice, StatusBadge } from '../components/ui';
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<DataRequest[] | null>(null);
@@ -35,7 +36,7 @@ export default function RequestsPage() {
 
       <div className="card">
         {requests === null ? (
-          <Spinner />
+          <TableSkeleton rows={4} cols={7} />
         ) : requests.length === 0 ? (
           <Empty>
             No requests yet. Browse the <strong>Dataset Catalogue</strong> to request access.

@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { adminApi } from '../api/admin';
 import type { Clinic } from '../api/types';
-import { Spinner, Empty, Modal } from '../components/ui';
+import { TableSkeleton } from '../components/Skeleton';
+import { Empty, Modal } from '../components/ui';
 
 const CLINIC_TYPES = ['clinic', 'hospital', 'polyclinic', 'teaching_hospital', 'basic_health_unit'];
 
@@ -87,7 +88,7 @@ export default function ClinicsPage() {
 
       <div className="card">
         {!clinics ? (
-          <Spinner />
+          <TableSkeleton rows={5} cols={6} />
         ) : clinics.length === 0 ? (
           <Empty>No clinics yet.</Empty>
         ) : (

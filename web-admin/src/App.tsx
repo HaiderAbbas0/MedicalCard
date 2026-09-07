@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import { Spinner } from './components/ui';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
+import { ToastProvider } from './components/Toast';
 import LoginPage from './pages/LoginPage';
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -60,13 +61,15 @@ function Root() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ErrorBoundary>
-          <Suspense fallback={<Spinner />}>
-            <Root />
-          </Suspense>
-        </ErrorBoundary>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <ErrorBoundary>
+            <Suspense fallback={<Spinner />}>
+              <Root />
+            </Suspense>
+          </ErrorBoundary>
+        </AuthProvider>
+      </ToastProvider>
     </BrowserRouter>
   );
 }

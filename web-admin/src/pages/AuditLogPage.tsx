@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../api/admin';
 import type { AuditEntry } from '../api/types';
-import { Spinner, Empty } from '../components/ui';
+import { TableSkeleton } from '../components/Skeleton';
+import { Empty } from '../components/ui';
 
 export default function AuditLogPage() {
   const [logs, setLogs] = useState<AuditEntry[] | null>(null);
@@ -12,7 +13,7 @@ export default function AuditLogPage() {
   }, []);
 
   if (error) return <div className="error-text">{error}</div>;
-  if (!logs) return <Spinner />;
+  if (!logs) return <TableSkeleton rows={5} cols={6} />;
 
   return (
     <div className="card">

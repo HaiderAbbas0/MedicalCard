@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { doctorApi } from '../../api/doctor';
 import type { Appointment } from '../../api/types';
-import { Spinner, Empty, StatusBadge } from '../../components/ui';
+import { TableSkeleton } from '../../components/Skeleton';
+import { Empty, StatusBadge } from '../../components/ui';
 
 const localToday = () => {
   const now = new Date();
@@ -41,7 +42,7 @@ export default function AppointmentsPage() {
 
       <div className="card">
         {!appts ? (
-          <Spinner />
+          <TableSkeleton rows={5} cols={6} />
         ) : appts.length === 0 ? (
           <Empty>No appointments for this date.</Empty>
         ) : (

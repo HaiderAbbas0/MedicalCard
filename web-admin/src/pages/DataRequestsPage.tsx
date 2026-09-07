@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { researchAdminApi, type AdminDataRequest } from '../api/research';
-import { Empty, Modal, Spinner, StatusBadge } from '../components/ui';
+import { TableSkeleton } from '../components/Skeleton';
+import { Empty, Modal, StatusBadge } from '../components/ui';
 
 type Decision = 'approved' | 'rejected' | 'revoked';
 type Target = { req: AdminDataRequest; decision: Decision } | null;
@@ -74,7 +75,7 @@ export default function DataRequestsPage() {
 
       <div className="card">
         {requests === null ? (
-          <Spinner />
+          <TableSkeleton rows={5} cols={8} />
         ) : requests.length === 0 ? (
           <Empty>No data requests yet.</Empty>
         ) : (

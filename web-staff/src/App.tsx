@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { Spinner } from './components/ui';
 import ErrorBoundary from './components/ErrorBoundary';
+import { ToastProvider } from './components/Toast';
 import StaffLayout from './components/StaffLayout';
 import LoginPage from './pages/LoginPage';
 
@@ -79,13 +80,15 @@ function Root() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ErrorBoundary>
+      <ToastProvider>
+        <AuthProvider>
+          <ErrorBoundary>
           <Suspense fallback={<Spinner />}>
             <Root />
           </Suspense>
-        </ErrorBoundary>
-      </AuthProvider>
+          </ErrorBoundary>
+        </AuthProvider>
+      </ToastProvider>
     </BrowserRouter>
   );
 }

@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
+import { ToastProvider } from './components/Toast';
 import { Spinner } from './components/ui';
 import LoginPage from './pages/LoginPage';
 
@@ -40,16 +41,18 @@ function LoginRoute() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ErrorBoundary>
-          <Suspense fallback={<Spinner />}>
-            <Routes>
-              <Route path="/login" element={<LoginRoute />} />
-              <Route path="/*" element={<ProtectedRoutes />} />
-            </Routes>
-          </Suspense>
-        </ErrorBoundary>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <ErrorBoundary>
+            <Suspense fallback={<Spinner />}>
+              <Routes>
+                <Route path="/login" element={<LoginRoute />} />
+                <Route path="/*" element={<ProtectedRoutes />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
+        </AuthProvider>
+      </ToastProvider>
     </BrowserRouter>
   );
 }

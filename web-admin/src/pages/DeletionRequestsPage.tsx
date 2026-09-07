@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../api/admin';
 import type { DeletionRequest, DeletionStatus } from '../api/types';
-import { Spinner, Empty, Modal, StatusBadge } from '../components/ui';
+import { TableSkeleton } from '../components/Skeleton';
+import { Empty, Modal, StatusBadge } from '../components/ui';
 
 const ACTIONS: { status: DeletionStatus; label: string; cls: string }[] = [
   { status: 'processing', label: 'Mark processing', cls: 'btn-ghost' },
@@ -48,7 +49,7 @@ export default function DeletionRequestsPage() {
     <>
       <div className="card">
         {!requests ? (
-          <Spinner />
+          <TableSkeleton rows={5} cols={6} />
         ) : requests.length === 0 ? (
           <Empty>No account deletion requests.</Empty>
         ) : (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { researchAdminApi, type ResearchOrg } from '../api/research';
-import { Empty, Modal, Spinner, StatusBadge } from '../components/ui';
+import { TableSkeleton } from '../components/Skeleton';
+import { Empty, Modal, StatusBadge } from '../components/ui';
 
 type Action = { org: ResearchOrg; status: 'active' | 'rejected' | 'suspended' } | null;
 
@@ -60,7 +61,7 @@ export default function ResearchOrgsPage() {
 
       <div className="card">
         {orgs === null ? (
-          <Spinner />
+          <TableSkeleton rows={5} cols={7} />
         ) : orgs.length === 0 ? (
           <Empty>No research organisations have registered yet.</Empty>
         ) : (

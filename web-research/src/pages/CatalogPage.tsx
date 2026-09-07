@@ -3,7 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { researchApi } from '../api/research';
 import type { CohortFilters, ResearchDataset } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
-import { Empty, Modal, Notice, Spinner } from '../components/ui';
+import { CardSkeleton } from '../components/Skeleton';
+import { Empty, Modal, Notice } from '../components/ui';
 
 const LEGAL_BASES = [
   { value: 'consent', label: 'Explicit consent (GDPR Art. 9(2)(a))' },
@@ -54,7 +55,7 @@ export default function CatalogPage() {
       {error && <div className="card card-pad error-text">{error}</div>}
 
       {datasets === null ? (
-        <Spinner />
+        <CardSkeleton count={3} />
       ) : datasets.length === 0 ? (
         <div className="card"><Empty>No datasets are published yet.</Empty></div>
       ) : (

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { labApi } from '../../api/lab';
 import type { LabQueueOrder } from '../../api/types';
-import { Spinner, Empty, Modal } from '../../components/ui';
+import { TableSkeleton } from '../../components/Skeleton';
+import { Empty, Modal } from '../../components/ui';
 
 const PRIORITY_CLASS: Record<string, string> = { stat: 'badge-red', urgent: 'badge-amber', routine: 'badge-green' };
 
@@ -31,7 +32,7 @@ export default function LabQueuePage() {
       {error && <div className="error-text" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="card">
         {!orders ? (
-          <Spinner />
+          <TableSkeleton rows={5} cols={6} />
         ) : orders.length === 0 ? (
           <Empty>No pending orders for your lab.</Empty>
         ) : (

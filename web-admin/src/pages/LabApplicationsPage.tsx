@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../api/admin';
 import type { Lab } from '../api/types';
-import { Spinner, Empty, Modal } from '../components/ui';
+import { TableSkeleton } from '../components/Skeleton';
+import { Empty, Modal } from '../components/ui';
 
 export default function LabApplicationsPage() {
   const [labs, setLabs] = useState<Lab[] | null>(null);
@@ -47,7 +48,7 @@ export default function LabApplicationsPage() {
   }
 
   if (error) return <div className="error-text">{error}</div>;
-  if (!labs) return <Spinner />;
+  if (!labs) return <TableSkeleton rows={5} cols={5} />;
 
   return (
     <div className="card">

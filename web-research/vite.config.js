@@ -8,5 +8,8 @@ export default defineConfig({
     plugins: [react()],
     server: {
         port: 5175,
+        // src/index.css imports ../../shared-ui/theme.css, which lives outside this
+        // app's root — the dev server needs explicit permission to serve it.
+        fs: { allow: ['..'] },
     },
 });

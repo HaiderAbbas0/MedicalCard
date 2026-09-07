@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { buildManifest, downloadFile, researchApi, toCsv, toJsonl } from '../api/research';
 import type { DataRequest } from '../api/types';
-import { Empty, Notice, Spinner } from '../components/ui';
+import { CardSkeleton } from '../components/Skeleton';
+import { useToast } from '../components/Toast';
+import { Empty, Notice } from '../components/ui';
 
 export default function DownloadsPage() {
   const [requests, setRequests] = useState<DataRequest[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     setError(null);
@@ -31,16 +33,15 @@ export default function DownloadsPage() {
   const download = async (req: DataRequest, format: 'csv' | 'jsonl') => {
     const code = req.dataset?.code;
     if (!code) {
-      setError('This request is not linked to a known dataset.');
+      toast.error('This request is not linked to a known dataset.');
       return;
     }
     setBusyId(req.id);
     setError(null);
-    setNote(null);
     try {
       const rows = await researchApi.exportRows(code, req.id);
       if (!rows.length) {
-        setNote('That cohort returned no rows — no consented patients currently match.');
+        toast.push('That cohort returned no rows — no consented patients currently match.');
         return;
       }
       const stamp = new Date().toISOString().slice(0, 10);
@@ -57,10 +58,14 @@ export default function DownloadsPage() {
         buildManifest(req, rows.length, format),
         'application/json',
       );
-      setNote(`Exported ${rows.length.toLocaleString()} rows, plus a provenance manifest.`);
+      toast.success(
+        `Exported ${rows.length.toLocaleString()} rows, plus a provenance manifest.`,
+      );
       void load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Export failed.');
+      const message = e instanceof Error ? e.message : 'Export failed.';
+      setError(message);
+      toast.error(message);
     } finally {
       setBusyId(null);
     }
@@ -76,12 +81,8 @@ export default function DownloadsPage() {
       </Notice>
 
       {error && <div className="card card-pad error-text">{error}</div>}
-      {note && (
-        <div className="card card-pad" style={{ color: 'var(--green)', fontWeight: 600 }}>{note}</div>
-      )}
-
       {requests === null ? (
-        <Spinner />
+        <CardSkeleton count={2} />
       ) : requests.length === 0 ? (
         <div className="card">
           <Empty>
