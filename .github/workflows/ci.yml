@@ -39,7 +39,7 @@ jobs:
         run: npm audit --audit-level=high
         continue-on-error: true
       - name: Upload build output
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.app }}-dist
           path: ${{ matrix.app }}/dist
