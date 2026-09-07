@@ -118,8 +118,6 @@ create table if not exists public.research_data_requests (
   decided_at timestamptz,
   decided_by uuid references public.profiles(id),
   expires_at timestamptz,
-  -- Per-request salt: the reason two extracts cannot be linked together.
-  pseudonym_salt text not null default encode(gen_random_bytes(32), 'hex'),
   export_count integer not null default 0,
   last_exported_at timestamptz,
   created_at timestamptz not null default now()
@@ -127,13 +125,21 @@ create table if not exists public.research_data_requests (
 create index if not exists idx_research_requests_org on public.research_data_requests (organization_id, created_at desc);
 create index if not exists idx_research_requests_status on public.research_data_requests (status, created_at desc);
 
--- The salt must never be readable by the client, even by its own researcher.
-revoke select on public.research_data_requests from anon, authenticated;
-grant select (id, organization_id, dataset_id, requested_by, title, research_purpose,
-              legal_basis, cohort_filters, ethics_approval_reference, dpa_accepted,
-              status, decision_note, decided_at, decided_by, expires_at,
-              export_count, last_exported_at, created_at)
-  on public.research_data_requests to authenticated;
+-- The per-request salt is the reason two extracts cannot be linked together, so
+-- it lives in its own table that NO client role can read. Keeping it in a column
+-- of research_data_requests would have meant hiding it with a column-level
+-- grant, which silently breaks `select *` for every caller; an unreadable side
+-- table is both safer and simpler. SECURITY DEFINER functions bypass RLS and so
+-- can still reach it.
+create table if not exists public.research_request_secrets (
+  request_id uuid primary key references public.research_data_requests(id) on delete cascade,
+  pseudonym_salt text not null,
+  created_at timestamptz not null default now()
+);
+alter table public.research_request_secrets enable row level security;
+-- Deliberately no policies: with RLS on and nothing granted, every client read
+-- returns nothing.
+revoke all on public.research_request_secrets from anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 4. Helpers
@@ -160,8 +166,12 @@ create or replace function public.research_k_threshold()
 returns integer language sql immutable as $$ select 5 $$;
 
 -- Stable within one request, unlinkable across requests.
+-- search_path includes `extensions` because Supabase installs pgcrypto there,
+-- while a self-hosted `create extension pgcrypto` may land it in public —
+-- naming both makes digest() resolve either way.
 create or replace function public.research_pseudonym(p_patient uuid, p_salt text)
-returns text language sql immutable strict as $$
+returns text language sql immutable strict
+set search_path = public, extensions as $$
   select encode(digest(p_patient::text || ':' || p_salt, 'sha256'), 'hex')
 $$;
 
@@ -329,8 +339,9 @@ returns text language plpgsql security definer stable set search_path = public a
 declare
   s text;
 begin
-  select r.pseudonym_salt into s
+  select sec.pseudonym_salt into s
     from public.research_data_requests r
+    join public.research_request_secrets sec on sec.request_id = r.id
    where r.id = p_request
      and r.organization_id = public.my_research_org()
      and r.status = 'approved'
@@ -528,7 +539,7 @@ create policy p_research_req_upd on public.research_data_requests for update to 
   using (public.is_admin()) with check (public.is_admin());
 
 -- Belt and braces: even a mis-written policy cannot let a request be born
--- approved, or let a client choose its own salt.
+-- approved. A researcher who posts status='approved' gets 'pending' anyway.
 create or replace function public.tg_research_request_defaults()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
@@ -541,7 +552,6 @@ begin
     new.export_count := 0;
     new.last_exported_at := null;
   end if;
-  new.pseudonym_salt := encode(gen_random_bytes(32), 'hex');
   return new;
 end;
 $$;
@@ -549,6 +559,24 @@ drop trigger if exists trg_research_request_defaults on public.research_data_req
 create trigger trg_research_request_defaults
   before insert on public.research_data_requests
   for each row execute function public.tg_research_request_defaults();
+
+-- The salt is minted server-side, after insert, where no client can influence
+-- it. Generated explicitly here rather than leaning on the column default, so
+-- resolution of gen_random_bytes() depends only on this function's search_path.
+create or replace function public.tg_research_request_secret()
+returns trigger language plpgsql security definer
+set search_path = public, extensions as $$
+begin
+  insert into public.research_request_secrets (request_id, pseudonym_salt)
+  values (new.id, encode(gen_random_bytes(32), 'hex'))
+  on conflict (request_id) do nothing;
+  return new;
+end;
+$$;
+drop trigger if exists trg_research_request_secret on public.research_data_requests;
+create trigger trg_research_request_secret
+  after insert on public.research_data_requests
+  for each row execute function public.tg_research_request_secret();
 
 -- ---------------------------------------------------------------------------
 -- 9. Admin decision RPC — records the decision and notifies the requester.

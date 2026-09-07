@@ -14,6 +14,8 @@ const ClinicsPage = lazy(() => import('./pages/ClinicsPage'));
 const CardDeliveriesPage = lazy(() => import('./pages/CardDeliveriesPage'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const DeletionRequestsPage = lazy(() => import('./pages/DeletionRequestsPage'));
+const ResearchOrgsPage = lazy(() => import('./pages/ResearchOrgsPage'));
+const DataRequestsPage = lazy(() => import('./pages/DataRequestsPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
 const TermsPage = lazy(() => import('./pages/legal/TermsPage'));
 
@@ -31,6 +33,8 @@ function ProtectedRoutes() {
         <Route path="/clinics" element={<ClinicsPage />} />
         <Route path="/card-deliveries" element={<CardDeliveriesPage />} />
         <Route path="/deletion-requests" element={<DeletionRequestsPage />} />
+        <Route path="/research-orgs" element={<ResearchOrgsPage />} />
+        <Route path="/data-requests" element={<DataRequestsPage />} />
         <Route path="/audit" element={<AuditLogPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>

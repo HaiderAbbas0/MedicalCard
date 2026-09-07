@@ -11,6 +11,8 @@ const NAV = [
   { to: '/clinics', label: 'Clinics', icon: 'clinic' },
   { to: '/card-deliveries', label: 'Card Deliveries', icon: 'card' },
   { to: '/deletion-requests', label: 'Deletion Requests', icon: 'trash' },
+  { to: '/research-orgs', label: 'Research Orgs', icon: 'research' },
+  { to: '/data-requests', label: 'Data Requests', icon: 'dataset' },
   { to: '/audit', label: 'Audit Log', icon: 'audit' },
 ];
 
@@ -22,6 +24,8 @@ const TITLES: Record<string, string> = {
   '/clinics': 'Clinics',
   '/card-deliveries': 'Card Deliveries',
   '/deletion-requests': 'Account Deletion Requests',
+  '/research-orgs': 'Research Organisations',
+  '/data-requests': 'Research Data Requests',
   '/audit': 'Audit Log',
 };
 

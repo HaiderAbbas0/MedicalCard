@@ -43,8 +43,9 @@ directly — there is no separate application API server.
 | `lib/`        | Flutter (Android + iOS + web) | **Mobile** — patient · doctor · lab worker · receptionist |
 | `web-admin/`  | React 18 + TS (Vite, :5173)  | **Admin web app** — administrators only |
 | `web-staff/`  | React 18 + TS (Vite, :5174)  | **Staff web app** — doctor · lab worker · receptionist (role-routed) |
+| `web-research/` | React 18 + TS (Vite, :5175) | **Research web app** — approved external organisations, de-identified data only |
 
-### The five roles
+### The six roles
 
 | Role          | Client       | Highlights                                                        |
 | ------------- | ------------ | ----------------------------------------------------------------- |
@@ -52,7 +53,8 @@ directly — there is no separate application API server.
 | Doctor        | Mobile + Web | Patient lookup by CNIC, encounters, prescribing (with allergy check), lab orders, result review/release, availability, messaging, document upload |
 | Lab worker    | Mobile + Web | Priority order queue, sample tracking, result upload (masked patient identity) |
 | Receptionist  | Mobile + Web | Clinic schedule, slot-aware walk-in booking, check-in (demographics only) |
-| Admin         | Web          | Approvals, suspensions, clinics, staff creation, dashboard, audit log, notification bell, card-delivery queue, account-deletion queue |
+| Admin         | Web          | Approvals, suspensions, clinics, staff creation, dashboard, audit log, notification bell, card-delivery queue, account-deletion queue, research org & data-request review |
+| Researcher    | Web (research) | Cohort exploration on k-anonymised aggregates, dataset catalogue, data-access requests, ML-ready de-identified exports. **No access to any identifiable record.** |
 
 ---
 
@@ -432,6 +434,96 @@ directly — there is no separate application API server.
   timestamps (`now`, `5m`, `3h`, `2d`, then a date), unread highlighting, and
   close-on-outside-click.
 
+## 10. Research data platform *(new)*
+
+Lets approved external organisations — universities, public-health bodies,
+pharma, ML teams — work with HayaatID clinical data **without ever receiving an
+identifiable record**. Two tiers: open k-anonymised aggregates for exploring
+what exists, and approval-gated de-identified row-level extracts for training.
+
+### Five guarantees, enforced in the database
+
+Researchers hold `role = 'researcher'` and are deliberately **not staff** —
+`is_staff()` excludes them, so every existing clinical RLS policy already denies
+them. They can reach nothing except through `SECURITY DEFINER` functions that
+apply all of the following:
+
+1. **Consent is a hard gate.** Only patients who explicitly switched on the
+   `research` consent are ever in scope; the default is off. The check runs at
+   query time, never from a snapshot, so **withdrawal takes effect immediately**
+   for every subsequent query and export.
+2. **No direct identifiers can leave.** Name, CNIC, Hayaat ID, phone, email,
+   address, and exact date of birth are excluded at source, along with **all
+   clinical free text** (chief complaint, history, examination, assessment,
+   plan, medication instructions) — free text being the largest
+   re-identification risk in a health record. Documents, lab files and chat
+   messages are out of scope entirely.
+3. **Pseudonyms are per-request.** Each approved request gets its own random
+   salt, stored in a table no client role can read, and `subject_id` is a
+   one-way SHA-256 digest of the patient id and that salt. The same person
+   therefore carries a **different id in every extract**, so two studies or two
+   organisations cannot join their datasets to rebuild an individual. No
+   function maps a `subject_id` back to a person.
+4. **k-anonymity on aggregates.** Any group smaller than **5** is suppressed and
+   returned as `< 5` rather than a count, defeating the narrow-the-filter attack.
+5. **Every access is audited.** Cohort queries and row-level exports both write
+   to the append-only audit log, attributed to the caller and stamped with the
+   server clock.
+
+### Generalisation applied
+
+| Field | Released as |
+| ----- | ----------- |
+| Age / date of birth | 5-year band (`30-34`), 90+ collapsed |
+| Location | Province only — city and street are never released |
+| Diagnosis | ICD-10 chapter letter, plus the coded condition name |
+| Observation date | Year-month (`2026-09`) — never an exact date |
+
+### Datasets (ML-ready)
+
+| Code | Grain | Contents |
+| ---- | ----- | -------- |
+| `patient_features` | one row per patient | The primary training matrix: banded demographics plus counts of encounters, conditions, chronic conditions, medications, active medications, allergies, lab orders, appointments and no-shows, first/last encounter year, and mean systolic / pulse |
+| `conditions` | one row per diagnosis | ICD-10 chapter, coded condition name, chronic flag, severity, clinical status, recorded year |
+| `observations` | one row per observation | Numeric vitals with unit and reference range, by year-month — suitable for longitudinal and sequence models |
+
+Each dataset ships a machine-readable **data dictionary** rendered in the portal.
+
+### The researcher journey
+
+1. **Cohort Explorer** — filter by age band, gender and province; see live
+   k-anonymised totals, breakdowns and ICD-10-chapter prevalence as bar charts.
+   Suppressed strata render as `< 5` rather than a number.
+2. **Dataset Catalogue** — browse the three datasets with full column-level data
+   dictionaries and tier badges.
+3. **Request access** — state a study title, a research purpose (min. 30 chars),
+   a legal basis (Art. 9(2)(a) consent / 9(2)(i) public health / 9(2)(j)
+   research), an optional ethics reference, and accept the data-sharing
+   agreement. The cohort filters explored in step 1 are carried into the request
+   so the approver reviews exactly the population that will be released.
+4. **Admin review** — an administrator sees the purpose, basis, cohort and
+   organisation, then approves with an expiry (default 180 days), rejects with a
+   mandatory reason, or revokes a live approval. The decision notifies the
+   requester and is audited.
+5. **Download** — CSV or JSONL, plus a **provenance manifest** recording the
+   request, purpose, legal basis, cohort, approval date, expiry, row count and
+   the privacy terms, so an extract is never separated from the terms it was
+   released under.
+
+### Structural safeguards
+
+- A researcher **cannot self-approve**: a `BEFORE INSERT` trigger forces
+  `status = 'pending'` and discards any client-supplied expiry, and the update
+  policy admits admins only.
+- **Approvals expire at the database level** — once past `expires_at`, the
+  export functions refuse, rather than relying on the UI to hide a button.
+- **Organisation suspension is immediate** — `my_research_org()` only resolves
+  for an `active` organisation, so suspending one cuts off its researchers and
+  their exports at once.
+- Patients get a transparency RPC, `my_research_participation()`, returning
+  their consent state, exactly what is and is not shared, how many approved
+  studies currently use the data, and how to withdraw.
+
 ---
 
 # UX & design system
@@ -605,20 +697,27 @@ directly — there is no separate application API server.
 
 # Data model
 
-**27 tables** — `profiles`, `patient_profiles`, `doctor_profiles`,
+**31 tables.** Clinical core — `profiles`, `patient_profiles`, `doctor_profiles`,
 `lab_worker_profiles`, `receptionist_profiles`, `admin_profiles`, `clinics`,
 `diagnostic_labs`, `doctor_availability`, `appointments`, `encounters`,
 `conditions`, `medication_requests`, `medication_logs`, `observations`,
 `allergies`, `lab_orders`, `lab_results`, `medical_documents`, `cards`,
 `conversations`, `messages`, `notifications`, `audit_logs`, `consents`,
-`consent_preferences`, `deletion_requests`.
+`consent_preferences`, `deletion_requests`. Research platform —
+`research_organizations`, `researcher_profiles`, `research_datasets`,
+`research_data_requests`, plus `research_request_secrets` (holds the per-request
+pseudonym salt; RLS-enabled with **no policies**, so no client can read it).
 
 **Key RPCs** — `login_email`, `find_patient_by_identifier` /
 `find_patient_by_cnic`, `available_appointment_slots`,
 `request_patient_appointment`, `book_clinic_appointment`, `request_card`,
 `request_physical_card`, `start_conversation`, `export_my_data`,
 `set_consent_preference`, `admin_mark_deletion_request`, `gen_hayaat_id`,
-`hayaat_luhn_check_digit`, plus the role/access helpers.
+`hayaat_luhn_check_digit`, plus the role/access helpers. Research —
+`research_cohort_size`, `research_cohort_summary`,
+`research_condition_prevalence`, `research_export_patient_features`,
+`research_export_conditions`, `research_export_observations`,
+`admin_decide_data_request`, `my_research_participation`.
 
 **Triggers** — `on_auth_user_created` (profile + role-extension row + Hayaat ID
 + CNIC validation), `trg_stamp_audit`, `trg_stamp_consent`,
@@ -649,6 +748,7 @@ schema.sql → cards.sql → revision.sql → security.sql → chat.sql
           → perf_indexes.sql → product_hardening.sql → remove_demo_data.sql
           → hayaat_id_only.sql → patient_records.sql → cnic_identity.sql
           → clinical_narrative_rls.sql → card_number_consistency.sql
+          → research_platform.sql
 ```
 
 `cnic_identity.sql` restores the CNIC identity that `hayaat_id_only.sql` had
@@ -692,8 +792,9 @@ If unset, all three fall back to the shared development project baked into sourc
 ## 3. Run the web apps
 
 ```bash
-cd web-admin && npm install && npm run dev     # http://localhost:5173  (admins only)
-cd web-staff && npm install && npm run dev     # http://localhost:5174  (doctor/lab/receptionist)
+cd web-admin && npm install && npm run dev      # http://localhost:5173  (admins only)
+cd web-staff && npm install && npm run dev      # http://localhost:5174  (doctor/lab/receptionist)
+cd web-research && npm install && npm run dev   # http://localhost:5175  (approved research orgs)
 ```
 
 ## 4. Run the mobile app (Flutter)
@@ -735,9 +836,15 @@ cd supabase/tests && npm install && npm test          # expect: 27 passed, 0 fai
 # Card → admin-notification workflow, end to end
 node supabase/tests/verify_card_workflow.mjs           # expect: 6 passed, 0 failed
 
+# Privacy verification for the research platform: signs in as a real researcher
+# and tries to reach what it must not — direct table reads, k-anonymity bypass,
+# self-approval, the pseudonym salt, and identifier columns in an extract.
+node supabase/tests/verify_research_privacy.mjs
+
 # Web apps
 cd web-admin && npm run build                          # tsc -b + vite build
 cd web-staff && npm run build
+cd web-research && npm run build
 
 # Mobile
 flutter analyze                                        # no errors
@@ -757,6 +864,16 @@ node supabase/tests/seed_fake_pk_data.mjs
 # specialties, prescriptions, vitals, lab orders + released results with real
 # PDFs, allergies, appointments, and a chat thread.
 node supabase/tests/seed_clinical_data.mjs
+
+# Research platform: a demo organisation + researcher account.
+node supabase/tests/seed_research_account.mjs
+# then paste the generated research_account_promote.generated.sql into the SQL editor
+
+# Opt patients in to research so the portal has a cohort. Uses the same
+# set_consent_preference RPC the app's Consent Management screen calls —
+# there is no back door. Re-run with --off to withdraw and watch the
+# cohort shrink immediately.
+node supabase/tests/seed_research_consent.mjs
 ```
 
 All seeding goes through the **ordinary public API as the signed-in role**, so
@@ -786,6 +903,7 @@ sign in with CNIC, email, or phone:
 | Lab worker | `ahmed.hussain1.lab@hayaatfake.id` (Punjab Diagnostic Lab) |
 | Receptionist | `ahmed.hussain1.front@hayaatfake.id` (Al-Shifa) |
 | Admin | `fake.admin@hayaatfake.id` |
+| Researcher | `researcher@hayaatfake.id` (Punjab Health Research Institute) |
 
 **Original demo set** (`seed_demo_accounts.mjs` + `demo_seed.sql`) — password
 `Hayaat@2026`, sign in with the CNIC:
@@ -848,6 +966,12 @@ self-service sign-up is deliberately clamped to patient/doctor.
   destructive confirmations.
 - Lab rejection reasons and reactivation notes are collected in the admin UI but
   not persisted.
+- **Research platform caveats** — organisations are onboarded by an
+  administrator rather than self-registering; k is fixed at 5 rather than being
+  configurable per dataset; there is no differential-privacy noise layer on top
+  of k-anonymity; and export volume is recorded (`export_count`) but not rate-
+  limited. Extracts are generated in the browser, so a very large cohort will be
+  memory-bound — server-side streaming would be the next step for production scale.
 
 Do not treat the system as production-ready until the OTP/MFA, push, deploy, and
 the lab-result-link items above are resolved.
@@ -860,6 +984,7 @@ the lab-result-link items above are resolved.
 - Privileged server ops → `supabase/functions/*`
 - RLS verification & seeding → `supabase/tests/`
 - Client data access → `lib/services/*` (Flutter), `web-*/src/api/*` (React)
+- Research platform → `supabase/research_platform.sql` (all five guarantees), `web-research/`, `supabase/tests/verify_research_privacy.mjs`
 - Design system → `lib/theme/*`, `lib/widgets/common/*` (Flutter); `web-*/src/index.css` + `components/ui.tsx` (React)
 - Records library model → `docs/PATIENT_RECORDS_LIBRARY.md`, `lib/models/medical_specialty.dart`
 - CI/CD & deployment → `.github/workflows/`, `docs/DEPLOYMENT.md`, `docs/OPERATIONS_RUNBOOK.md`
