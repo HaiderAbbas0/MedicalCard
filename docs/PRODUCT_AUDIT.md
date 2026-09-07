@@ -25,6 +25,11 @@ The largest blocker is deployment drift. The repository contains security harden
 | Receptionist schedule | Pass / fixed | Defaults to today. Booking accepts a 16-digit Hayaat ID and rejects past dates. Reception cancellations now use `cancelled_by_clinic`. |
 | Patient signup + OTP | Blocked for requested credentials | The current product password policy requires at least 8 characters with a letter and number; the requested five-character password is intentionally invalid and Supabase also rejects it. Signup additionally requires patient identity fields and a phone. The development OTP remains `11111`; real SMS is not wired. |
 | RLS automated suite | Fail | 26 passed, 1 failed: a pending doctor could read patient encounters on the live backend. Apply the migrations before further testing. |
+| Research portal login and routing | Pass | `web-research` (port 5175 in dev) signs in a `researcher` and routes to the catalogue, cohort explorer, requests, downloads, and compliance pages. Researchers are not staff — `is_staff()` excludes them, so existing clinical RLS denies them outright. |
+| Research cohort explorer and aggregates | Pass | `research_cohort_size`, `research_cohort_summary`, and `research_condition_prevalence` return only consented patients and suppress any cell below the k-anonymity threshold of 5. Withdrawing consent drops the numbers on the next query, because the consent check is at query time rather than from a snapshot. |
+| Research exports | Pass | `research_export_patient_features`, `research_export_conditions`, and `research_export_observations` require an approved, unexpired request belonging to the caller's active organisation. Pseudonyms are salted per request, so two extracts cannot be linked. No direct identifiers or clinical free text are released. |
+| Admin research org and data request review | Pass | Admin portal gains "Research Orgs" (`/research-orgs`) and "Data Requests" (`/data-requests`). Approve/reject/suspend an organisation; approve with an access period, reject, or revoke a request via `admin_decide_data_request`. A trigger forces new requests to `pending`, so a researcher cannot self-approve. |
+| Research privacy suite | Pass | `node supabase/tests/verify_research_privacy.mjs` — 41 of 41 assertions pass against the development project. It signs in as a real researcher through the public API and attempts, in good faith, to reach data it should not. |
 
 ## Changes completed in this pass
 
@@ -38,6 +43,9 @@ The largest blocker is deployment drift. The repository contains security harden
 - Added structured prescription authoring, preview, professional footer configuration, historical signature snapshots, and patient display.
 - Removed fake lab result submissions without a file.
 - Added clinic/hospital required-field, duplicate, and receptionist-password validation.
+- Added the research data platform: `supabase/research_platform.sql` (organisations, researcher profiles, dataset catalogue, data requests, per-request pseudonym salts in `research_request_secrets` with RLS on and no policies), the `researcher` role, the `research_*` SECURITY DEFINER functions, `admin_decide_data_request`, and `my_research_participation` for patient transparency.
+- Added the `web-research` portal (Vite, port 5175 in dev) and the admin "Research Orgs" and "Data Requests" pages.
+- Added research seeding and verification scripts: `seed_research_account.mjs`, `seed_research_consent.mjs` (uses the patient app's own `set_consent_preference` RPC; `--off` withdraws), and `verify_research_privacy.mjs`.
 
 ## Production blockers
 
@@ -58,6 +66,8 @@ The largest blocker is deployment drift. The repository contains security harden
 5. **No server-side transaction across multi-step workflows.** Encounter finalization, booking + notifications, clinic + receptionist creation, and lab result + status changes can partially succeed. Move these to database functions or Edge Functions with transactional semantics/idempotency keys.
 6. **Admin destructive/privileged actions need stronger controls.** Add MFA, step-up authentication, reason capture, dual approval for sensitive operations, session timeout, and complete audit coverage.
 7. **Patient build was stale and Flutter tooling was unavailable in this environment.** Rebuild the patient web/mobile app from current source and rerun the full signup-to-prescription workflow after database migration.
+8. **The privacy suite is outside the CI gate.** `web-research` is now in the `ci.yml` build matrix and `dependabot.yml`, so it is typechecked and patched alongside the other portals. `verify_research_privacy.mjs` still runs manually: it needs a seeded researcher account and an approved request in the target project. Wire it in beside the RLS suite so the privacy guarantees are enforced on every push, not on demand.
+9. **Researcher provisioning is manual.** Self-service signup cannot mint a `researcher`, so promotion is done by pasting generated SQL. That is correct as a safety property but needs an audited admin path before onboarding real organisations, along with a signed data agreement recorded outside the `dpa_accepted_at` flag.
 
 ### P2 — product quality and theme
 
@@ -74,4 +84,5 @@ Do not onboard real patients until all P0 items pass. Minimum automated gate:
 1. Apply every migration to a clean staging project.
 2. RLS suite passes for anonymous, patient, treating/non-treating doctor, pending/suspended doctor, receptionist in/out of clinic, lab worker in/out of lab, and admin.
 3. Web builds, Flutter analyze/tests, migration smoke test, and end-to-end role workflows pass in CI.
-4. Restore test, backup/PITR test, incident runbook, privacy/legal review, and clinical safety review are complete.
+4. Research privacy suite passes (`verify_research_privacy.mjs`), and no research organisation is `active` without a signed data agreement.
+5. Restore test, backup/PITR test, incident runbook, privacy/legal review, and clinical safety review are complete.

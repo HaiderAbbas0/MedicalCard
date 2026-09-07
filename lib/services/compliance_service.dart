@@ -5,7 +5,7 @@ import 'supabase_client.dart';
 class ComplianceService {
   /// Version of the legal documents currently in force. Keep in sync with
   /// `docs/legal/*` and the web apps.
-  static const String legalVersion = '2026-07-04';
+  static const String legalVersion = '2026-09-07';
 
   /// Record acceptance of the Privacy Policy + Terms for the signed-in user.
   /// Called right after account creation. Best-effort: failures must not block

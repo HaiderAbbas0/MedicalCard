@@ -984,7 +984,7 @@ the lab-result-link items above are resolved.
 - Privileged server ops → `supabase/functions/*`
 - RLS verification & seeding → `supabase/tests/`
 - Client data access → `lib/services/*` (Flutter), `web-*/src/api/*` (React)
-- Research platform → `supabase/research_platform.sql` (all five guarantees), `web-research/`, `supabase/tests/verify_research_privacy.mjs`
+- Research platform → `docs/RESEARCH_PLATFORM.md` (threat model + operations), `supabase/research_platform.sql`, `web-research/`, `supabase/tests/verify_research_privacy.mjs`
 - Design system → `lib/theme/*`, `lib/widgets/common/*` (Flutter); `web-*/src/index.css` + `components/ui.tsx` (React)
 - Records library model → `docs/PATIENT_RECORDS_LIBRARY.md`, `lib/models/medical_specialty.dart`
 - CI/CD & deployment → `.github/workflows/`, `docs/DEPLOYMENT.md`, `docs/OPERATIONS_RUNBOOK.md`

@@ -1,12 +1,13 @@
 # Deployment & CI/CD
 
 The production architecture is **Supabase-first** (see the root `README.md`).
-There are three deployable artifacts and one managed backend:
+There are four deployable artifacts and one managed backend:
 
 | Artifact | What it is | Where it runs |
 | --- | --- | --- |
 | `web-admin/` | Static SPA (Vite build → `dist/`) | Any static host / CDN |
 | `web-staff/` | Static SPA (Vite build → `dist/`) | Any static host / CDN |
+| `web-research/` | Static SPA (Vite build → `dist/`) — research portal for approved organisations | Any static host / CDN |
 | `lib/` (Flutter) | Android / iOS app | App stores / internal distribution |
 | `supabase/` | Postgres schema + RLS + Edge Functions | **Supabase (managed)** — the backend |
 
@@ -22,13 +23,18 @@ Runs on every push / PR to `main`:
 
 | Job | Gate |
 | --- | --- |
-| **Web** (matrix: web-admin, web-staff) | `npm ci` → `npm run build` (**`tsc -b` typecheck + Vite build**) → `npm audit` (high+) → uploads `dist/` artifact |
+| **Web** (matrix: web-admin, web-staff, web-research) | `npm ci` → `npm run build` (**`tsc -b` typecheck + Vite build**) → `npm audit` (high+) → uploads `dist/` artifact |
 | **Flutter** | `flutter pub get` → `flutter analyze` → `flutter test` |
 | **RLS policy suite** | `supabase/tests` — signs in as every role and asserts every policy (see `supabase/tests/README.md`) |
 
+`verify_research_privacy.mjs` is **not yet wired into CI** — it needs a seeded
+researcher account and an approved request in the target project, so it is
+currently run manually against a project that has both. Adding it alongside the
+RLS suite is the next step.
+
 Plus:
 - **`codeql.yml`** — CodeQL security scanning (JavaScript/TypeScript) on push/PR + weekly.
-- **`dependabot.yml`** — weekly dependency + GitHub-Actions update PRs for both web apps, the RLS suite, and Flutter (`pub`).
+- **`dependabot.yml`** — weekly dependency + GitHub-Actions update PRs for all three web apps, the RLS suite, and Flutter (`pub`).
 
 ### Configuring the RLS job
 By default the suite targets the shared dev/demo Supabase project (publishable key
@@ -43,12 +49,16 @@ each with its own Supabase project and its own environment secrets:
 
 | Secret | Used by | Notes |
 | --- | --- | --- |
-| `VITE_SUPABASE_URL` | web build | per environment |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | web build | publishable (browser-safe) |
+| `VITE_SUPABASE_URL` | web build (all three portals) | per environment |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | web build (all three portals) | publishable (browser-safe) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase Edge Function config only | **never** in a web/Flutter build or committed |
 
 Client config is read from env at build time (`web-*/.env`, Flutter
-`--dart-define`); see each app's `.env.example`.
+`--dart-define`); see each app's `.env.example`. `web-research/` takes the same
+two `VITE_SUPABASE_*` variables and nothing else — it needs no elevated key,
+because the research portal reaches data only through the SECURITY DEFINER
+`research_*` functions, which enforce consent, de-identification and
+k-anonymity in the database. A `service_role` key must **never** appear in it.
 
 ## Deploying
 
@@ -58,9 +68,14 @@ Apply them to the target project's SQL editor / via the Supabase CLI **in order*
 all are idempotent. Deploy Edge Functions with `supabase functions deploy <name>`.
 
 ### Web apps
-`npm run build` produces a static `dist/` (already uploaded as a CI artifact).
-Publish that folder to your chosen static host. **A hosting provider has not been
-chosen yet** — this is a product decision. Once chosen (e.g. Vercel, Netlify,
+`npm run build` (`tsc -b` + `vite build`) produces a static `dist/` in each of
+`web-admin/`, `web-staff/` and `web-research/` (the first two are already
+uploaded as CI artifacts). In development they run on distinct ports —
+`web-admin` 5173, `web-staff` 5174, `web-research` 5175 — so all three can run
+side by side. Publish each `dist/` to your chosen static host; the research
+portal is a separate origin from the staff and admin portals and should be
+hosted as its own site. **A hosting provider has not been chosen yet** — this is
+a product decision. Once chosen (e.g. Vercel, Netlify,
 Cloudflare Pages, or GitHub Pages), add a `deploy.yml` workflow triggered on
 release/tag that builds with the environment's `VITE_SUPABASE_*` secrets and
 uploads to that host with its token. Until then, deployment is done manually from

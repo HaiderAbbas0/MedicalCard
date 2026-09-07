@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [web-admin, web-staff]
+        app: [web-admin, web-staff, web-research]
     defaults:
       run:
         working-directory: ${{ matrix.app }}

@@ -62,6 +62,11 @@ export default function PrivacyPolicyPage() {
           <strong>Administrators</strong> — platform administrators can access account and audit
           data to operate the service, resolve issues, and act on your rights requests.
         </li>
+        <li>
+          <strong>Approved research organisations</strong> — only if you opt in, and only ever in
+          de-identified form. They cannot see your identity, your doctor's written notes, your
+          documents or your messages. See Section 5.
+        </li>
       </ul>
       <p>
         Access is enforced at the database level through row-level security, so each user sees only
@@ -69,14 +74,54 @@ export default function PrivacyPolicyPage() {
         advertising.
       </p>
 
-      <h2>5. Where your data is stored</h2>
+      <h2>5. Research use (optional, opt-in only)</h2>
+      <p>
+        You can choose to let your data contribute to health research by turning on{' '}
+        <strong>Research</strong> under Settings → Consent management in the patient app. It is{' '}
+        <strong>off by default</strong> — doing nothing means your data is never used for research.
+        This is separate from the consent you give at sign-up, and turning it off does not affect
+        your care.
+      </p>
+      <p>
+        If you opt in, approved research organisations receive a de-identified version of your
+        record: your age as a <strong>5-year band</strong> (never your date of birth), your gender,
+        province and blood group (never your city or address), counts of your visits, diagnoses,
+        chronic conditions, medicines, allergies, lab orders and appointments, your diagnosis
+        category (ICD-10 chapter), and numeric vital-sign readings dated only to the month.
+      </p>
+      <p>They never receive:</p>
+      <ul>
+        <li>Your name, CNIC, Hayaat ID, phone, email or address</li>
+        <li>Your date of birth</li>
+        <li>
+          <strong>Anything your doctor typed in their own words</strong> — complaints, history,
+          examination notes, assessments, plans and medication instructions are excluded entirely
+        </li>
+        <li>Your uploaded documents, lab-result files, or messages with clinicians</li>
+      </ul>
+      <p>
+        You are labelled with a scrambled code that is regenerated for every separate study, so two
+        organisations cannot combine their datasets to work out that two records belong to the same
+        person, and there is no way to convert that code back into your identity. Any statistic
+        covering fewer than five people is withheld rather than shown. Every organisation is vetted,
+        must state the purpose of its study, must accept an agreement forbidding any attempt to
+        identify anyone, and its access expires automatically. Every query and download is logged.
+      </p>
+      <p>
+        The legal basis is your <strong>explicit consent</strong> (GDPR Art. 6(1)(a) and Art.
+        9(2)(a)). You can withdraw at any time and it takes effect immediately for every subsequent
+        query and download. Datasets already downloaded before you withdrew cannot be recalled; the
+        organisation is contractually required to delete them when its access expires.
+      </p>
+
+      <h2>6. Where your data is stored</h2>
       <p>
         Your data is stored in a managed PostgreSQL database hosted on Supabase, protected in transit
         and at rest and governed by row-level security policies. Files such as card photos are held
         in the associated secure object storage.
       </p>
 
-      <h2>6. How long we keep it</h2>
+      <h2>7. How long we keep it</h2>
       <p>
         We retain medical records for as long as necessary to provide continuity of care and to meet
         applicable clinical record-keeping requirements. Account and audit records are retained for
@@ -85,7 +130,7 @@ export default function PrivacyPolicyPage() {
         your request has been reviewed and completed.
       </p>
 
-      <h2>7. Your rights</h2>
+      <h2>8. Your rights</h2>
       <ul>
         <li><strong>Access</strong> — you can view the personal and clinical data we hold about you.</li>
         <li><strong>Export</strong> — you can request a copy of your data in a portable form.</li>
@@ -98,26 +143,26 @@ export default function PrivacyPolicyPage() {
         <li><strong>Correction</strong> — you can ask us to correct inaccurate identity or contact data.</li>
       </ul>
 
-      <h2>8. Security</h2>
+      <h2>9. Security</h2>
       <p>
         We protect your data with role-based access control, row-level security, encrypted
         connections, and audit logging. No system is perfectly secure; please keep your credentials
         confidential and tell us promptly if you suspect unauthorised access.
       </p>
 
-      <h2>9. Children</h2>
+      <h2>10. Children</h2>
       <p>
         Records for minors are created and managed by a parent, guardian, or treating clinician on
         the minor&rsquo;s behalf.
       </p>
 
-      <h2>10. Changes to this policy</h2>
+      <h2>11. Changes to this policy</h2>
       <p>
         We may update this policy from time to time. The version and last-updated date at the top of
         this page indicate the current version.
       </p>
 
-      <h2>11. Contact</h2>
+      <h2>12. Contact</h2>
       <p>
         For any privacy question, or to exercise your rights, contact the Platform&rsquo;s data
         protection team at <a href="mailto:privacy@hayaat.id">privacy@hayaat.id</a>.

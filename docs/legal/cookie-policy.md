@@ -1,6 +1,6 @@
 # Cookie & Local Storage Policy
 
-**Version:** 2026-07-04 · **Last updated:** 4 July 2026
+**Version:** 2026-09-07 · **Last updated:** 7 September 2026
 
 > ⚠️ **Template — pending review by qualified legal counsel.**
 

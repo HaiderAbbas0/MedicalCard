@@ -2,8 +2,8 @@
 /// in `docs/legal/*.md`; keep the version string in sync with
 /// [ComplianceService.legalVersion].
 class LegalText {
-  static const String version = '2026-07-04';
-  static const String lastUpdated = '4 July 2026';
+  static const String version = '2026-09-07';
+  static const String lastUpdated = '7 September 2026';
 
   static const String disclaimer =
       'This is a template pending review by qualified legal counsel and must not '
@@ -27,8 +27,31 @@ WHO CAN SEE IT
   see orders with your identity masked; receptionists see appointment details
   only, not clinical records.
 • Administrators — for approvals and audit review.
+• Approved research organisations — only if you opt in, and only in
+  de-identified form (see below).
 Access is enforced in the database (row-level security), not just in the app.
 Suspended or unapproved staff have no access. We never sell your data.
+
+RESEARCH USE — OPTIONAL, OFF BY DEFAULT
+You can let your data help health research by turning on Research in
+Settings > Consent management. Doing nothing means it is never used.
+
+If you opt in, approved organisations receive a de-identified version of your
+record: your age as a 5-year band, gender, province and blood group; counts of
+your visits, diagnoses, medicines, allergies and lab orders; your diagnosis
+category; and vital-sign readings dated only to the month.
+
+They never receive your name, CNIC, Hayaat ID, phone, email, address, date of
+birth, anything your doctor typed in their own words, your documents, or your
+messages.
+
+You are given a different scrambled code in every dataset, so two organisations
+cannot combine their data to work out that two records are the same person, and
+any statistic covering fewer than five people is hidden. Every organisation is
+vetted, must state its purpose, and its access expires.
+
+You can withdraw any time and it applies immediately to all future extracts.
+Withdrawing does not affect your care.
 
 WHERE IT IS STORED
 In our managed database (Supabase/PostgreSQL). Lab-result files are private and

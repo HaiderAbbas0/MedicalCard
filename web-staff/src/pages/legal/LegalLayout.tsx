@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
-export const LEGAL_VERSION = '2026-07-04';
-export const LEGAL_LAST_UPDATED = '4 July 2026';
+export const LEGAL_VERSION = '2026-09-07';
+export const LEGAL_LAST_UPDATED = '7 September 2026';
 
 /** Shared wrapper for the public legal pages: readable max-width container,
  * mandatory "pending legal review" disclaimer, version + last-updated line. */

@@ -24,8 +24,9 @@ Supabase dashboard → **SQL Editor** → **New query**. Paste and **Run** each 
 15. [`clinical_narrative_rls.sql`](./clinical_narrative_rls.sql) — keeps the consultation narrative (encounters, diagnoses, prescriptions, vitals, allergies) away from lab workers and receptionists
 16. [`card_number_consistency.sql`](./card_number_consistency.sql) — one Hayaat number per patient: `request_card()` reuses the number issued at sign-up instead of minting a new one, and `profiles` / `cards` / `patient_profiles` are reconciled
 17. [`demo_seed.sql`](./demo_seed.sql) — optional. Demo clinic, laboratory, and staff roles for the six demo accounts. Run `node ../tests/seed_demo_accounts.mjs` first.
+18. [`research_platform.sql`](./research_platform.sql) — **run last, after `clinical_narrative_rls.sql`.** The research data platform: `research_organizations`, `researcher_profiles`, `research_datasets`, `research_data_requests`, and `research_request_secrets` (per-request pseudonym salts — RLS on with **no policies**, so no client can ever read it), plus the `researcher` role and the SECURITY DEFINER `research_*` functions (`research_cohort_size`, `research_cohort_summary`, `research_condition_prevalence`, `research_export_patient_features`, `research_export_conditions`, `research_export_observations`), `admin_decide_data_request`, and `my_research_participation`. Researchers are deliberately **not** staff — `is_staff()` excludes them, so every clinical RLS policy already denies them and these functions are their only route to data. Access is gated on the opt-in `research` consent key, aggregates below a k-anonymity threshold of 5 are suppressed, pseudonyms are salted per request (extracts are unlinkable), no direct identifiers or clinical free text are released, approvals expire in the database, and every query/export is audited.
 
-Files 1-17 are also mirrored as timestamped migrations under
+Files 1-18 are also mirrored as timestamped migrations under
 [`migrations/`](./migrations), so `supabase db push` can apply them to a linked
 project instead of pasting into the SQL editor.
 
@@ -67,11 +68,26 @@ The apps are already wired with your keys:
 - A patient uses the same Hayaat ID on their virtual and physical card.
 
 ## Web apps (also on Supabase now)
-Both web apps talk to Supabase directly (no Node backend):
+All three web apps talk to Supabase directly (no Node backend):
 ```bash
-cd web-admin && npm install && npm run dev   # http://localhost:5173  (admins)
-cd web-staff && npm install && npm run dev   # http://localhost:5174  (doctor/lab/reception)
+cd web-admin    && npm install && npm run dev   # http://localhost:5173  (admins)
+cd web-staff    && npm install && npm run dev   # http://localhost:5174  (doctor/lab/reception)
+cd web-research && npm install && npm run dev   # http://localhost:5175  (approved researchers)
 ```
+
+### Optional: seed and verify the research platform
+After running `research_platform.sql`:
+```bash
+node ../tests/seed_research_account.mjs    # demo org + researcher; paste the SQL it writes
+node ../tests/seed_research_consent.mjs    # opt test patients in (--off withdraws again)
+node ../tests/verify_research_privacy.mjs  # 41-assertion privacy suite
+```
+`seed_research_account.mjs` creates the auth account through the ordinary public
+API and writes `research_account_promote.generated.sql` for you to paste, because
+self-service signup is clamped to patient/doctor and cannot mint a `researcher`.
+`seed_research_consent.mjs` uses the same `set_consent_preference` RPC as the
+patient app — there is no back door. Demo login:
+`researcher@hayaatfake.id` / `Hayaat@2026` (org "Punjab Health Research Institute").
 
 ### Optional: enable admin "Create staff/admin account"
 Creating a new auth user needs the service role, so it runs in an Edge Function.

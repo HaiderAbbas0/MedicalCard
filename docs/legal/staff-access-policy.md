@@ -1,6 +1,6 @@
 # Staff Access Policy (Sensitive Data Handling)
 
-**Version:** 2026-07-04 · **Last updated:** 4 July 2026
+**Version:** 2026-09-07 · **Last updated:** 7 September 2026
 
 > ⚠️ **Template — pending review by qualified legal counsel and your clinical
 > governance team.**
@@ -19,7 +19,13 @@ approved**. All access is recorded.
 - **Receptionist** — demographic and appointment data only. **No** access to
   clinical records.
 - **Administrator** — user approvals, suspension/reactivation, clinic/lab
-  management, and audit-log review. Admins do not have a clinical role.
+  management, research organisation and data-request review, and audit-log
+  review. Admins do not have a clinical role.
+- **Researcher** (external, not clinic staff) — **no** access to any identifiable
+  record. Researchers are deliberately excluded from `is_staff()`, so every
+  clinical RLS policy denies them; they can reach data only through
+  de-identifying functions gated on patient opt-in consent. See the
+  [Research Platform doc](../RESEARCH_PLATFORM.md).
 - **Suspended or pending** staff have **no** data access at the database layer,
   regardless of the app UI.
 
