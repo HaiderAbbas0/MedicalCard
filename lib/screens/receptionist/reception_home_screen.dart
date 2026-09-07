@@ -27,7 +27,9 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
     _reload();
   }
 
-  void _reload() => setState(() => _future = _service.clinicAppointments());
+  void _reload() => setState(() {
+    _future = _service.clinicAppointments();
+  });
 
   Future<void> _act(Future<void> Function() action) async {
     try {

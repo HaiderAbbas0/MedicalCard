@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>HayaatID uses the microphone so you can dictate messages and notes by voice.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>HayaatID uses speech recognition to turn your voice into text.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

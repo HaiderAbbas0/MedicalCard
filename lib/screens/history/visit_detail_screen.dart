@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../controllers/record_controller.dart';
 import '../../models/record_models.dart';
+import '../../services/report_pdf_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../../widgets/common/ai_explain_sheet.dart';
 import '../../widgets/common/gradient_button.dart';
+import '../../widgets/common/pdf_export_sheet.dart';
 import '../../widgets/common/press_scale.dart';
 
 class VisitDetailScreen extends StatelessWidget {
@@ -188,6 +192,51 @@ class VisitDetailScreen extends StatelessWidget {
                     }
                   },
                 ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    final user = context.read<AuthController>().currentUser;
+                    showPdfExportSheet(
+                      context,
+                      title: 'Export visit summary',
+                      filename: ReportPdfService.fileName('visit ${v.dateLabel}'),
+                      build: () => ReportPdfService().buildVisitPdf(
+                        v,
+                        PdfPatientInfo.fromUser(user),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                    foregroundColor: c.primary,
+                    side: BorderSide(color: c.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.picture_as_pdf_outlined, size: 20),
+                  label: const Text(
+                    'Export as PDF',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => showAiExplainSheet(context, record: _visitAiPayload(v)),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                    foregroundColor: c.primary,
+                    side: BorderSide(color: c.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.auto_awesome_rounded, size: 20),
+                  label: const Text(
+                    'Explain this visit',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
               ],
             ),
           ),
@@ -196,6 +245,20 @@ class VisitDetailScreen extends StatelessWidget {
     );
   }
 }
+
+Map<String, dynamic> _visitAiPayload(VisitModel v) => {
+  'type': 'Visit summary',
+  'date': '${v.dateLabel} ${v.time}'.trim(),
+  'doctor': v.doctor,
+  'specialty': v.specialty,
+  'facility': v.hospital,
+  'symptoms': v.symptoms,
+  'diagnosis': v.diagnosis,
+  'diagnosisNote': v.diagnosisNote,
+  'medicines': v.meds.map((m) => '${m.name} ${m.strength} · ${m.freq} · ${m.dur}').toList(),
+  'followUp': v.followUp,
+  'advice': v.advice,
+};
 
 class _Card extends StatelessWidget {
   final Widget child;

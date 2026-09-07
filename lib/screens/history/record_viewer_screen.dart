@@ -3,11 +3,15 @@ import 'package:intl/intl.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:provider/provider.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../controllers/record_controller.dart';
 import '../../models/medical_specialty.dart';
 import '../../models/record_models.dart';
+import '../../services/report_pdf_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../../widgets/common/ai_explain_sheet.dart';
+import '../../widgets/common/pdf_export_sheet.dart';
 
 class RecordViewerScreen extends StatefulWidget {
   final String recordId;
@@ -54,6 +58,30 @@ class _RecordViewerScreenState extends State<RecordViewerScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Explain this record',
+            icon: Icon(Icons.auto_awesome_rounded, color: c.primary),
+            onPressed: () => showAiExplainSheet(context, record: _aiPayload(item)),
+          ),
+          IconButton(
+            tooltip: 'Export / share',
+            icon: Icon(Icons.ios_share_rounded, color: c.primary),
+            onPressed: () {
+              final user = context.read<AuthController>().currentUser;
+              showPdfExportSheet(
+                context,
+                title: 'Export ${item.type.label.toLowerCase()}',
+                filename: ReportPdfService.fileName(item.type.label, item.date),
+                build: () => ReportPdfService().buildRecordPdf(
+                  item,
+                  PdfPatientInfo.fromUser(user),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 6),
+        ],
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -530,6 +558,18 @@ class _MetadataRow extends StatelessWidget {
     );
   }
 }
+
+/// A plain, JSON-safe summary of a record for the "explain this record"
+/// assistant. Excludes file URLs (signed links, not useful to the model).
+Map<String, dynamic> _aiPayload(MedicalRecordModel item) => {
+  'type': item.type.label,
+  'title': item.title,
+  'date': DateFormat('d MMMM yyyy').format(item.date),
+  'doctor': item.doctor,
+  'facility': item.facility,
+  'summary': item.summary,
+  'details': item.details,
+};
 
 List<Widget> _detailWidgets(
   BuildContext context,

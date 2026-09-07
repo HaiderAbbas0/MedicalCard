@@ -6,6 +6,7 @@ import '../../models/clinical_models.dart';
 import '../../services/patient_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/brand_app_bar.dart';
+import '../../widgets/common/voice_input_button.dart';
 
 /// Patient views upcoming/past appointments and can cancel (P-FR-014/015).
 class AppointmentsScreen extends StatefulWidget {
@@ -26,7 +27,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     _reload();
   }
 
-  void _reload() => setState(() => _future = _service.myAppointments());
+  void _reload() => setState(() {
+    _future = _service.myAppointments();
+  });
 
   Future<void> _cancel(AppointmentModel a) async {
     final ok = await showDialog<bool>(
@@ -347,6 +350,7 @@ class _BookAppointmentSheetState extends State<_BookAppointmentSheet> {
                 decoration: InputDecoration(
                   hintText: 'Reason for visit or notes for doctor',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  suffixIcon: VoiceInputButton(controller: _notesCtrl),
                 ),
               ),
               const SizedBox(height: 18),

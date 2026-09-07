@@ -5,6 +5,7 @@ import '../../models/medical_specialty.dart';
 import '../../services/doctor_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/brand_app_bar.dart';
+import '../../widgets/common/voice_input_button.dart';
 
 /// Create an encounter for a patient: chief complaint, diagnoses, medications
 /// (with allergy check), vitals, then finalize (Scope §7.2 / UC-D003).
@@ -444,6 +445,7 @@ class _NewEncounterScreenState extends State<NewEncounterScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    suffixIcon: VoiceInputButton(controller: _chiefCtrl),
                   ),
                 ),
                 const SizedBox(height: 16),

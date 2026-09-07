@@ -36,7 +36,9 @@ class _DoctorAvailabilityScreenState extends State<DoctorAvailabilityScreen> {
     _reload();
   }
 
-  void _reload() => setState(() => _future = _service.availability());
+  void _reload() => setState(() {
+    _future = _service.availability();
+  });
 
   Future<void> _addSlot() async {
     final result = await showModalBottomSheet<bool>(

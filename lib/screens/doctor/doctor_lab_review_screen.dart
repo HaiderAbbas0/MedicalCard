@@ -26,7 +26,9 @@ class _DoctorLabReviewScreenState extends State<DoctorLabReviewScreen> {
     _reload();
   }
 
-  void _reload() => setState(() => _future = _service.labOrdersForReview());
+  void _reload() => setState(() {
+    _future = _service.labOrdersForReview();
+  });
 
   Future<void> _act(Future<void> Function() action, String done) async {
     try {

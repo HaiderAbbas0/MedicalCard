@@ -28,7 +28,9 @@ class _LabHomeScreenState extends State<LabHomeScreen> {
     _reload();
   }
 
-  void _reload() => setState(() => _future = _service.queue());
+  void _reload() => setState(() {
+    _future = _service.queue();
+  });
 
   Future<void> _act(Future<void> Function() action) async {
     try {

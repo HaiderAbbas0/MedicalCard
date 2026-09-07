@@ -25,6 +25,10 @@ dependencies:
   supabase_flutter: ^2.8.0
   pdfrx: ^2.4.4
   url_launcher: ^6.3.1
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.0
+  pdf: ^3.13.0
+  printing: ^5.15.0
 
 dev_dependencies:
   flutter_test:

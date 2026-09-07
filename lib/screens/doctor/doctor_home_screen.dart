@@ -30,7 +30,9 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
     _reload();
   }
 
-  void _reload() => setState(() => _future = _service.appointments());
+  void _reload() => setState(() {
+    _future = _service.appointments();
+  });
 
   Future<void> _searchPatient() async {
     final identifier = await showDialog<String>(

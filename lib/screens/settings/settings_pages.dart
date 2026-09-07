@@ -8,12 +8,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../controllers/auth_controller.dart';
+import '../../controllers/record_controller.dart';
 import '../../data/legal_text.dart';
 import '../../services/compliance_service.dart';
+import '../../services/report_pdf_service.dart';
 import '../../services/supabase_client.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/common/gradient_button.dart';
+import '../../widgets/common/pdf_export_sheet.dart';
 import '../../widgets/common/press_scale.dart';
 
 /// Shared back-header scaffold for settings sub-pages.
@@ -493,6 +496,13 @@ class _ConsentManagementScreenState extends State<ConsentManagementScreen> {
           children: [
             _navRow(
               context,
+              Icons.picture_as_pdf_outlined,
+              'Download health record (PDF)',
+              _busy ? null : _exportPdf,
+            ),
+            Divider(height: 22, color: context.c.border2),
+            _navRow(
+              context,
               Icons.download_rounded,
               'Download my data',
               _busy ? null : _export,
@@ -540,6 +550,34 @@ class _ConsentManagementScreenState extends State<ConsentManagementScreen> {
             Icon(Icons.chevron_right_rounded, size: 22, color: c.text3),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Human-readable PDF of the whole patient-held record (demographics,
+  /// allergies, active medicines, visits, lab reports).
+  Future<void> _exportPdf() async {
+    final records = context.read<RecordController>();
+    final user = context.read<AuthController>().currentUser;
+    if (!records.loaded) {
+      setState(() => _busy = true);
+      try {
+        await records.refresh();
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
+      if (!mounted) return;
+    }
+    await showPdfExportSheet(
+      context,
+      title: 'Export health record',
+      filename: ReportPdfService.fileName('health record'),
+      build: () => ReportPdfService().buildHealthRecordPdf(
+        patient: PdfPatientInfo.fromUser(user),
+        visits: records.visits,
+        prescriptions: records.prescriptions,
+        reports: records.reports,
+        allergies: records.allergies,
       ),
     );
   }
